@@ -1,0 +1,102 @@
+/* frontend/src/components/CandlestickChart.css */
+.chart-section {
+    margin: 20px auto;
+    padding: 15px;
+    max-width: 95%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    border: 1px solid #333;
+    border-radius: 8px;
+    background-color: #1c1c1c; /* Slightly lighter dark background */
+}
+
+.controls {
+    margin-bottom: 20px;
+    padding: 10px 15px;
+    background-color: #2a2a2a; /* Darker background for controls */
+    border-radius: 5px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    flex-wrap: wrap; /* Allow controls to wrap on smaller screens */
+}
+
+.controls label {
+    font-weight: bold;
+    color: #ccc; /* Lighter text color */
+}
+
+.controls select {
+    padding: 8px 12px;
+    border: 1px solid #444;
+    border-radius: 4px;
+    font-size: 1em;
+    background-color: #333; /* Dark background for select */
+    color: #eee; /* Light text for select */
+}
+
+.controls select:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.status-loading,
+.status-error {
+    margin-left: 10px;
+    font-style: italic;
+    padding: 5px 10px;
+    border-radius: 4px;
+}
+
+.status-loading {
+    color: #f0ad4e; /* Orange for loading */
+    background-color: rgba(240, 173, 78, 0.1);
+}
+
+.status-error {
+    color: #d9534f; /* Red for error */
+    background-color: rgba(217, 83, 79, 0.1);
+}
+
+.chart-container {
+    width: 100%;
+    min-height: 550px; /* Ensure it has some height even if parent collapses */
+    height: 600px; /* Fixed height, adjust as necessary */
+    border: 1px solid #444;
+    position: relative;
+    background-color: black; /* Ensure background is black */
+}
+
+.chart-placeholder-error {
+    width: 100%;
+    height: 600px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #aaa;
+    background-color: #111;
+    border: 1px dashed #444;
+    text-align: center;
+}
+/* Add to CandlestickChart.css */
+.status-indicator {
+    margin-left: 15px;
+    padding: 5px 10px;
+    border-radius: 12px; /* Make it pill-shaped */
+    font-size: 0.9em;
+    font-weight: bold;
+}
+
+.status-indicator.connected {
+    color: #26a69a; /* Teal/Green */
+    background-color: rgba(38, 166, 154, 0.15);
+    border: 1px solid rgba(38, 166, 154, 0.4);
+}
+
+.status-indicator.disconnected {
+    color: #ef5350; /* Red */
+    background-color: rgba(239, 83, 80, 0.1);
+    border: 1px solid rgba(239, 83, 80, 0.3);
+}

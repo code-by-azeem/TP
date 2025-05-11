@@ -13,7 +13,7 @@ import sys
 import os
 from datetime import datetime
 from threading import Lock
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, request, session
 from flask_cors import CORS
 from flask_socketio import SocketIO, emit
 from dotenv import load_dotenv
@@ -21,7 +21,7 @@ from dotenv import load_dotenv
 
 # --- Configuration ---
 load_dotenv()
-SYMBOL = os.getenv("MT5_SYMBOL", "XAUUSD")
+SYMBOL = os.getenv("MT5_SYMBOL", "ETHUSD")
 UPDATE_INTERVAL_SECONDS = 1 # Keeps the 1-second update interval
 # Use HISTORY_COUNT for initial load - adjust as needed for performance/depth
 HISTORY_COUNT = 5000
@@ -41,6 +41,10 @@ cors_origins = "http://localhost:3000"
 CORS(app, resources={r"/*": {"origins": cors_origins}})
 socketio = SocketIO(app, cors_allowed_origins=cors_origins, async_mode='eventlet')
 log.info(f"Flask-SocketIO initialized. Allowed origins: {cors_origins}")
+
+app.secret_key = 'your_secret_key'  # Set a strong secret key in production
+
+users = {}  # username: password (for demo only)
 
 # --- MT5 Connection ---
 def initialize_mt5():
@@ -123,6 +127,57 @@ def get_historical_data():
     log.info(f"Formatted and returning {len(data)} historical points.")
     return jsonify(data)
 # --- End of Modified /data Route ---
+
+@app.route('/account-info')
+def account_info():
+    log.info("Received request for /account-info")
+    account = mt5.account_info()
+    if account is None:
+        return jsonify({"error": "MT5 account info not available"}), 503
+    return jsonify({
+        "balance": account.balance,
+        "equity": account.equity,
+        "margin": account.margin,
+        "freeMargin": account.margin_free,
+        "marginLevel": account.margin_level,
+        "profit": account.profit
+    })
+
+@app.route('/signup', methods=['POST'])
+def signup():
+    data = request.json
+    username = data.get('username')
+    password = data.get('password')
+    if not username or not password:
+        return jsonify({'error': 'Username and password required'}), 400
+    if username in users:
+        return jsonify({'error': 'User already exists'}), 409
+    users[username] = password
+    session['username'] = username
+    initialize_mt5()  # Connect MT5 for this session
+    return jsonify({'message': 'Signup successful'})
+
+@app.route('/login', methods=['POST'])
+def login():
+    data = request.json
+    username = data.get('username')
+    password = data.get('password')
+    if users.get(username) != password:
+        return jsonify({'error': 'Invalid credentials'}), 401
+    session['username'] = username
+    initialize_mt5()
+    return jsonify({'message': 'Login successful'})
+
+@app.route('/logout', methods=['POST'])
+def logout():
+    session.pop('username', None)
+    return jsonify({'message': 'Logged out'})
+
+@app.route('/auth-check')
+def auth_check():
+    if 'username' in session:
+        return jsonify({'authenticated': True, 'username': session['username']})
+    return jsonify({'authenticated': False})
 
 # --- SocketIO Event Handlers (Corrected Signatures) ---
 @socketio.on('connect')

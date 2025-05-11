@@ -1,0 +1,46 @@
+.account-info-container {
+    background-color: #1e222d;
+    border-radius: 8px;
+    padding: 20px;
+    margin: 20px;
+    color: #d1d4dc;
+}
+
+.account-info-container h2 {
+    color: #787b86;
+    margin-bottom: 20px;
+    font-size: 1.2rem;
+}
+
+.account-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 15px;
+}
+
+.info-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px;
+    background-color: #2a2e39;
+    border-radius: 4px;
+}
+
+.label {
+    color: #787b86;
+    font-size: 0.9rem;
+}
+
+.value {
+    font-weight: 600;
+    font-size: 1rem;
+}
+
+.value.profit {
+    color: #26a69a;
+}
+
+.value.loss {
+    color: #ef5350;
+} 

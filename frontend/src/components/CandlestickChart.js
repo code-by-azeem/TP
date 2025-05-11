@@ -1,7 +1,7 @@
 // frontend/src/components/CandlestickChart.js
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { createChart, CrosshairMode, CandlestickSeries } from 'lightweight-charts';
-import { io } from 'socket.io-client';
+import io from 'socket.io-client';
 import './CandlestickChart.css';
 
 const FLASK_SERVER_URL = 'http://127.0.0.1:5000';
@@ -10,7 +10,6 @@ function CandlestickChart() {
     const chartContainerRef = useRef(null);
     const chartRef = useRef(null);
     const candlestickSeriesRef = useRef(null);
-    const socketRef = useRef(null);
 
     const [timeframe, setTimeframe] = useState('1m');
     const [isLoading, setIsLoading] = useState(true);
@@ -83,6 +82,13 @@ function CandlestickChart() {
             console.log("Chart and series initialized.");
             fetchHistoricalData(timeframe); // Fetch initial data
 
+            // Connect to backend WebSocket for real-time data
+            const socket = io('ws://localhost:5000');
+            socket.on('candlestick', (data) => {
+                // Data should be { time, open, high, low, close }
+                seriesRef.current.update(data);
+            });
+
         } catch (err) { setError(`Chart Init Failed: ${err.message}`); setIsLoading(false); console.error(err); }
 
         // Setup resize listener
@@ -90,24 +96,13 @@ function CandlestickChart() {
         window.addEventListener('resize', handleResize); handleResize();
 
         // Cleanup function for chart
-        return () => { /* ... chart cleanup ... */ };
+        return () => {
+            console.log("WS Cleanup: Disconnecting socket...");
+            socket.disconnect();
+            chartRef.current.remove();
+        };
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []); // Runs once
-
-    // Effect for WebSocket connection management (remains the same)
-    useEffect(() => {
-        if (!candlestickSeriesRef.current || socketRef.current) { return; }
-        console.log("WebSocket: Attempting connection...");
-        setError(null);
-        const socket = io(FLASK_SERVER_URL, { transports: ['websocket'] });
-        socketRef.current = socket;
-        const handleConnect = () => { console.log(`WS: CONNECTED! ID: ${socket.id}`); setIsConnected(true); setError(null); };
-        const handleDisconnect = (reason) => { console.warn(`WS: DISCONNECTED. Reason: ${reason}`); setIsConnected(false); };
-        const handleConnectError = (err) => { console.error('WS: Conn Error!', err); setIsConnected(false); setError(`WS Err: ${err.message}`); };
-        const handlePriceUpdate = (newCandleData) => { if (candlestickSeriesRef.current) candlestickSeriesRef.current.update(newCandleData); };
-        socket.on('connect', handleConnect); socket.on('disconnect', handleDisconnect); socket.on('connect_error', handleConnectError); socket.on('price_update', handlePriceUpdate);
-        return () => { console.log("WS Cleanup: Disconnecting socket..."); socket.off('connect', handleConnect); socket.off('disconnect', handleDisconnect); socket.off('connect_error', handleConnectError); socket.off('price_update', handlePriceUpdate); socket.disconnect(); socketRef.current = null; setIsConnected(false); };
-    }, []); // Corrected dependency
 
     // Effect for handling timeframe changes (remains the same)
     useEffect(() => {

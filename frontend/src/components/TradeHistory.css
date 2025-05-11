@@ -1,0 +1,70 @@
+.trade-history-container {
+    background-color: #1e222d;
+    border-radius: 8px;
+    padding: 20px;
+    margin: 20px;
+    color: #d1d4dc;
+}
+
+.trade-history-container h2 {
+    color: #787b86;
+    margin-bottom: 20px;
+    font-size: 1.2rem;
+}
+
+.trade-list {
+    overflow-x: auto;
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.9rem;
+}
+
+th, td {
+    padding: 12px;
+    text-align: left;
+    border-bottom: 1px solid #2a2e39;
+}
+
+th {
+    color: #787b86;
+    font-weight: 500;
+}
+
+tr:hover {
+    background-color: #2a2e39;
+}
+
+.buy {
+    color: #26a69a;
+}
+
+.sell {
+    color: #ef5350;
+}
+
+.profit {
+    color: #26a69a;
+}
+
+.loss {
+    color: #ef5350;
+}
+
+.status {
+    text-transform: capitalize;
+}
+
+.status.open {
+    color: #2962ff;
+}
+
+.status.closed {
+    color: #787b86;
+}
+
+tr.closed {
+    opacity: 0.7;
+} 

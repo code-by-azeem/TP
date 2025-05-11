@@ -1,19 +1,22 @@
 // frontend/src/App.js
 import React from 'react';
-import CandlestickChart from './components/CandlestickChart'; // We'll create this next
-import './App.css'; // We'll create this too
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import AuthPage from './components/AuthPage';
+import Dashboard from './components/Dashboard';
 
 function App() {
-    return (
-        <div className="App">
-            <header className="App-header">
-                <h1>Real-Time Candlestick Chart (React + Flask)</h1>
-            </header>
-            <main>
-                <CandlestickChart />
-            </main>
+  return (
+    <BrowserRouter>
+      <div className="centered-bg-wrapper">
+        <div className="centered-content">
+          <Routes>
+            <Route path="/" element={<AuthPage />} />
+            <Route path="/dashboard" element={<Dashboard />} />
+          </Routes>
         </div>
-    );
+      </div>
+    </BrowserRouter>
+  );
 }
 
 export default App;

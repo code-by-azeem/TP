@@ -1,0 +1,114 @@
+.auth-container {
+  background: rgba(10, 24, 51, 0.85);
+  border-radius: 18px;
+  padding: 40px 36px 32px 36px;
+  width: 370px;
+  min-height: 420px;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  color: #f5f6fa;
+  box-shadow:
+    0 8px 32px 0 rgba(31, 38, 135, 0.37),
+    0 0 0 4px #00f0ff33;
+  border: 1.5px solid #00f0ff55;
+  position: relative;
+  overflow: hidden;
+  backdrop-filter: blur(8px); /* Glass effect */
+}
+
+.auth-container::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 18px;
+  pointer-events: none;
+  box-shadow: 0 0 40px 10px #00f0ff55, 0 0 80px 20px #00f0ff33;
+  z-index: 0;
+}
+
+.auth-container h2 {
+  color: #00f0ff;
+  font-size: 2.2rem;
+  font-weight: 700;
+  margin-bottom: 28px;
+  letter-spacing: 1px;
+  text-shadow: 0 0 8px #00f0ff88;
+}
+
+.auth-container form {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.auth-container input {
+  padding: 12px 14px;
+  border-radius: 8px;
+  border: none;
+  background: #23272f;
+  color: #f5f6fa;
+  font-size: 1rem;
+  margin-bottom: 6px;
+  outline: none;
+  transition: box-shadow 0.2s;
+  box-shadow: 0 2px 8px rgba(60, 60, 60, 0.05);
+}
+
+.auth-container input:focus {
+  box-shadow: 0 0 0 2px #3fa9f5;
+}
+
+.auth-container button[type="submit"] {
+  background: linear-gradient(90deg, #3fa9f5 0%, #005bea 100%);
+  color: #fff;
+  font-weight: 600;
+  font-size: 1.1rem;
+  border: none;
+  border-radius: 8px;
+  padding: 12px 0;
+  margin-top: 8px;
+  cursor: pointer;
+  transition: background 0.2s, transform 0.1s;
+  box-shadow: 0 4px 16px rgba(63, 169, 245, 0.15);
+}
+
+.auth-container button[type="submit"]:hover {
+  background: linear-gradient(90deg, #005bea 0%, #3fa9f5 100%);
+  transform: translateY(-2px) scale(1.03);
+}
+
+.toggle-link {
+  margin-top: 18px;
+  color: #b2becd;
+  font-size: 1rem;
+  text-align: center;
+}
+
+.toggle-link button {
+  background: none;
+  border: none;
+  color: #3fa9f5;
+  font-weight: 600;
+  cursor: pointer;
+  margin-left: 6px;
+  font-size: 1rem;
+  transition: color 0.2s;
+}
+
+.toggle-link button:hover {
+  color: #005bea;
+  text-decoration: underline;
+}
+
+.error {
+  margin-top: 16px;
+  color: #ff4d4f;
+  background: #2d1a1a;
+  padding: 10px 16px;
+  border-radius: 8px;
+  font-size: 1rem;
+  box-shadow: 0 2px 8px rgba(255, 77, 79, 0.08);
+} 

@@ -1,0 +1,129 @@
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.75);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  animation: fadeIn 0.2s ease-in-out;
+  backdrop-filter: blur(3px);
+}
+
+.modal-container {
+  background: rgba(14, 22, 39, 0.95);
+  width: 400px;
+  max-width: 90%;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 15px 25px rgba(0, 0, 0, 0.5);
+  animation: slideIn 0.3s ease-out;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.modal-header {
+  padding: 16px 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.modal-header h3 {
+  margin: 0;
+  color: white;
+  font-size: 1.2rem;
+  font-weight: 500;
+}
+
+.modal-header.success {
+  background: linear-gradient(90deg, #0a2e36 0%, #0a4331 100%);
+  border-left: 4px solid #26A69A;
+}
+
+.modal-header.error {
+  background: linear-gradient(90deg, #3e1a1a 0%, #461a28 100%);
+  border-left: 4px solid #EF5350;
+}
+
+.modal-header.info {
+  background: linear-gradient(90deg, #1a2c3e 0%, #1a2346 100%);
+  border-left: 4px solid #3FA9F5;
+}
+
+.modal-body {
+  padding: 20px;
+  color: #e0e0e0;
+  line-height: 1.5;
+}
+
+.modal-footer {
+  padding: 15px 20px;
+  display: flex;
+  justify-content: flex-end;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.modal-button, .modal-action-button {
+  padding: 10px 20px;
+  border-radius: 6px;
+  font-weight: 500;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s;
+  outline: none;
+  font-size: 0.95rem;
+}
+
+.modal-button {
+  background: #2d3748;
+  color: white;
+}
+
+.modal-button:hover {
+  background: #3a4a5f;
+}
+
+.modal-action-button {
+  background: #3FA9F5;
+  color: white;
+  margin-left: 10px;
+}
+
+.modal-action-button:hover {
+  background: #288ad6;
+}
+
+.modal-close {
+  background: none;
+  border: none;
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 1.5rem;
+  cursor: pointer;
+  transition: color 0.2s;
+  line-height: 1;
+  padding: 0;
+  margin: 0;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.modal-close:hover {
+  color: white;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideIn {
+  from { transform: translateY(-20px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+} 

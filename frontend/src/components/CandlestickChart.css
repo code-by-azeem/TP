@@ -1,40 +1,65 @@
 /* frontend/src/components/CandlestickChart.css */
 .chart-section {
     margin: 20px auto;
-    padding: 15px;
-    max-width: 95%;
+    padding: 0; /* Remove padding to make chart bigger */
+    width: 100%;
     display: flex;
     flex-direction: column;
     align-items: center;
-    border: 1px solid #333;
-    border-radius: 8px;
-    background-color: #1c1c1c; /* Slightly lighter dark background */
+    border-radius: 12px;
+    background: linear-gradient(to bottom, rgba(22, 27, 39, 0.8), rgba(17, 23, 33, 0.9));
+    box-shadow: 0 15px 35px rgba(0, 0, 0, 0.3);
+    border: 1px solid rgba(63, 169, 245, 0.1);
+    overflow: hidden; /* Keep content inside border radius */
 }
 
 .controls {
-    margin-bottom: 20px;
-    padding: 10px 15px;
-    background-color: #2a2a2a; /* Darker background for controls */
-    border-radius: 5px;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+    width: 100%;
+    padding: 15px 25px;
+    background: rgba(20, 25, 38, 0.9);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
     display: flex;
     align-items: center;
     gap: 15px;
-    flex-wrap: wrap; /* Allow controls to wrap on smaller screens */
+    flex-wrap: wrap;
 }
 
 .controls label {
-    font-weight: bold;
-    color: #ccc; /* Lighter text color */
+    font-weight: 500;
+    color: #e0e0e0;
+    font-size: 0.95rem;
+    letter-spacing: 0.5px;
 }
 
 .controls select {
-    padding: 8px 12px;
-    border: 1px solid #444;
-    border-radius: 4px;
-    font-size: 1em;
-    background-color: #333; /* Dark background for select */
-    color: #eee; /* Light text for select */
+    padding: 10px 18px;
+    border: 1px solid rgba(63, 169, 245, 0.3);
+    border-radius: 8px;
+    font-size: 0.95rem;
+    background-color: rgba(13, 20, 33, 0.9);
+    color: #f0f0f0;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+    -webkit-appearance: none; /* Remove default styling */
+    appearance: none;
+    background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='rgba(255, 255, 255, 0.5)' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+    background-repeat: no-repeat;
+    background-position: right 10px center;
+    background-size: 1em;
+    padding-right: 30px;
+}
+
+.controls select:hover:not(:disabled) {
+    border-color: rgba(63, 169, 245, 0.7);
+    background-color: rgba(19, 29, 45, 0.9);
+    transform: translateY(-2px);
+}
+
+.controls select:focus {
+    outline: none;
+    border-color: #3FA9F5;
+    box-shadow: 0 0 0 3px rgba(63, 169, 245, 0.2);
 }
 
 .controls select:disabled {
@@ -44,59 +69,554 @@
 
 .status-loading,
 .status-error {
-    margin-left: 10px;
-    font-style: italic;
-    padding: 5px 10px;
-    border-radius: 4px;
+    font-style: normal;
+    padding: 8px 14px;
+    border-radius: 8px;
+    font-size: 0.9rem;
+    animation: pulse 2s infinite ease-in-out;
+    font-weight: 500;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.15);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.status-loading::before,
+.status-error::before {
+    content: "";
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
 }
 
 .status-loading {
-    color: #f0ad4e; /* Orange for loading */
-    background-color: rgba(240, 173, 78, 0.1);
+    color: #FFB74D;
+    background-color: rgba(255, 183, 77, 0.15);
+    border: 1px solid rgba(255, 183, 77, 0.3);
+}
+
+.status-loading::before {
+    background-color: #FFB74D;
+    animation: blink 1s infinite alternate;
 }
 
 .status-error {
-    color: #d9534f; /* Red for error */
-    background-color: rgba(217, 83, 79, 0.1);
+    color: #FF5252;
+    background-color: rgba(255, 82, 82, 0.15);
+    border: 1px solid rgba(255, 82, 82, 0.3);
+}
+
+.status-error::before {
+    background-color: #FF5252;
 }
 
 .chart-container {
     width: 100%;
-    min-height: 550px; /* Ensure it has some height even if parent collapses */
-    height: 600px; /* Fixed height, adjust as necessary */
-    border: 1px solid #444;
+    min-height: 650px; /* Make chart taller */
+    height: 70vh; /* Dynamic height based on viewport */
     position: relative;
-    background-color: black; /* Ensure background is black */
+    background-color: black;
+    overflow: hidden;
+    border-bottom-left-radius: 12px;
+    border-bottom-right-radius: 12px;
 }
 
 .chart-placeholder-error {
     width: 100%;
-    height: 600px;
+    height: 70vh;
     display: flex;
     align-items: center;
     justify-content: center;
-    color: #aaa;
-    background-color: #111;
-    border: 1px dashed #444;
+    color: #bbb;
+    background-color: rgba(17, 17, 17, 0.8);
+    border: 1px dashed rgba(255, 255, 255, 0.2);
     text-align: center;
+    border-radius: 8px;
+    font-size: 1.1rem;
+    padding: 20px;
 }
-/* Add to CandlestickChart.css */
+
+/* Status Indicator Styles */
 .status-indicator {
-    margin-left: 15px;
-    padding: 5px 10px;
-    border-radius: 12px; /* Make it pill-shaped */
-    font-size: 0.9em;
-    font-weight: bold;
+    margin-left: auto;
+    padding: 7px 14px;
+    border-radius: 30px;
+    font-size: 0.9rem;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    animation: glow 3s infinite alternate;
 }
 
 .status-indicator.connected {
-    color: #26a69a; /* Teal/Green */
-    background-color: rgba(38, 166, 154, 0.15);
-    border: 1px solid rgba(38, 166, 154, 0.4);
+    color: #4CAF50;
+    background-color: rgba(76, 175, 80, 0.15);
+    border: 1px solid rgba(76, 175, 80, 0.3);
 }
 
 .status-indicator.disconnected {
-    color: #ef5350; /* Red */
+    color: #FF5252;
+    background-color: rgba(255, 82, 82, 0.15);
+    border: 1px solid rgba(255, 82, 82, 0.3);
+}
+
+/* Diagnostic panel styles */
+.diagnostic-panel {
+    position: absolute;
+    right: 20px;
+    top: 20px;
+    background: rgba(15, 23, 42, 0.85);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border: 1px solid rgba(63, 169, 245, 0.2);
+    border-radius: 10px;
+    padding: 15px;
+    color: white;
+    font-size: 0.85rem;
+    max-width: 400px;
+    z-index: 100;
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.5);
+    overflow: hidden;
+    transition: all 0.3s ease;
+}
+
+.diagnostic-panel h3 {
+    margin-top: 0;
+    margin-bottom: 12px;
+    font-size: 1rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    color: #3FA9F5;
+    letter-spacing: 0.5px;
+    border-bottom: 1px solid rgba(63, 169, 245, 0.2);
+    padding-bottom: 8px;
+}
+
+.diagnostic-panel .close-button {
+    background: none;
+    border: none;
+    color: white;
+    cursor: pointer;
+    font-size: 1.2rem;
+    padding: 0;
+    margin: 0;
+    transition: all 0.2s ease;
+}
+
+.diagnostic-panel .close-button:hover {
+    color: #FF5252;
+    transform: scale(1.2);
+}
+
+.diagnostic-panel ul {
+    margin: 0;
+    padding: 0 0 0 20px;
+    line-height: 1.6;
+}
+
+.diagnostic-panel li {
+    margin-bottom: 6px;
+}
+
+.diagnostic-panel .status-good {
+    color: #4CAF50;
+    font-weight: 500;
+}
+
+.diagnostic-panel .status-warn {
+    color: #FF9800;
+    font-weight: 500;
+}
+
+.diagnostic-panel .status-error {
+    color: #FF5252;
+    font-weight: 500;
+}
+
+.diagnostic-panel button {
+    background: rgba(63, 169, 245, 0.2);
+    color: #3FA9F5;
+    border: 1px solid rgba(63, 169, 245, 0.3);
+    border-radius: 6px;
+    padding: 8px 12px;
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    margin-top: 10px;
+}
+
+.diagnostic-panel button:hover {
+    background: rgba(63, 169, 245, 0.3);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
+
+.diagnostic-toggle {
+    position: absolute;
+    right: 15px;
+    bottom: 15px;
+    background: rgba(15, 23, 42, 0.85);
+    backdrop-filter: blur(5px);
+    -webkit-backdrop-filter: blur(5px);
+    color: white;
+    border: 1px solid rgba(63, 169, 245, 0.3);
+    border-radius: 6px;
+    padding: 8px 12px;
+    font-size: 0.85rem;
+    cursor: pointer;
+    z-index: 100;
+    transition: all 0.2s ease;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.diagnostic-toggle:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 15px rgba(0, 0, 0, 0.4);
+    border-color: rgba(63, 169, 245, 0.5);
+}
+
+@keyframes pulse {
+    0% { opacity: 0.7; }
+    50% { opacity: 1; }
+    100% { opacity: 0.7; }
+}
+
+@keyframes blink {
+    from { opacity: 0.4; }
+    to { opacity: 1; }
+}
+
+@keyframes glow {
+    0% { box-shadow: 0 0 5px rgba(63, 169, 245, 0.3); }
+    100% { box-shadow: 0 0 15px rgba(63, 169, 245, 0.5); }
+}
+
+/* Responsive styles */
+@media (max-width: 768px) {
+    .controls {
+        flex-direction: column;
+        align-items: stretch;
+        padding: 12px;
+    }
+    
+    .status-indicator {
+        width: 100%;
+        justify-content: center;
+        margin-left: 0;
+        margin-top: 10px;
+    }
+    
+    .chart-container {
+        height: 60vh;
+        min-height: 400px;
+    }
+}
+
+.fullscreen-toggle {
+    position: absolute;
+    right: 15px;
+    bottom: 50px;
+    background: rgba(15, 23, 42, 0.85);
+    backdrop-filter: blur(5px);
+    -webkit-backdrop-filter: blur(5px);
+    color: white;
+    border: 1px solid rgba(63, 169, 245, 0.3);
+    border-radius: 6px;
+    padding: 8px 12px;
+    font-size: 0.85rem;
+    cursor: pointer;
+    z-index: 100;
+    transition: all 0.2s ease;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.fullscreen-toggle:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 15px rgba(0, 0, 0, 0.4);
+    border-color: rgba(63, 169, 245, 0.5);
+}
+
+/* Fullscreen mode adjustments */
+.chart-container:fullscreen {
+    padding: 20px;
+    background-color: #000;
+}
+
+.chart-container:fullscreen .fullscreen-toggle {
+    position: fixed;
+    right: 20px;
+    bottom: 20px;
+}
+
+.chart-container:fullscreen .diagnostic-toggle {
+    position: fixed;
+    right: 20px;
+    bottom: 70px;
+}
+
+/* Connection status styling */
+.connection-status {
+    display: flex;
+    align-items: center;
+    padding: 5px 10px;
+    border-radius: 4px;
+    margin-left: 10px;
+    font-weight: 500;
+    font-size: 14px;
+}
+
+.connection-status .status-icon {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    margin-right: 8px;
+}
+
+.connection-status.connected {
+    background-color: rgba(38, 166, 154, 0.1);
+    color: #26a69a;
+}
+
+.connection-status.connected .status-icon {
+    background-color: #26a69a;
+    box-shadow: 0 0 5px #26a69a;
+}
+
+.connection-status.disconnected {
     background-color: rgba(239, 83, 80, 0.1);
-    border: 1px solid rgba(239, 83, 80, 0.3);
+    color: #ef5350;
+}
+
+.connection-status.disconnected .status-icon {
+    background-color: #ef5350;
+    box-shadow: 0 0 5px #ef5350;
+}
+
+/* Chart status bar */
+.chart-status-bar {
+    display: flex;
+    align-items: center;
+    background-color: rgba(30, 34, 45, 0.8);
+    padding: 6px 12px;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    color: #d1d4dc;
+    font-size: 12px;
+    gap: 15px;
+}
+
+.chart-status-item {
+    display: flex;
+    align-items: center;
+}
+
+.status-label {
+    color: #787b86;
+    margin-right: 5px;
+}
+
+.status-value {
+    font-weight: 500;
+}
+
+.status-ok {
+    color: #26a69a;
+}
+
+.status-error {
+    color: #ef5350;
+}
+
+.status-warning {
+    color: #ff9800;
+}
+
+/* Style for diagnostics panel */
+.diagnostics-panel {
+    position: absolute;
+    bottom: 50px;
+    right: 10px;
+    background-color: rgba(30, 34, 45, 0.9);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 4px;
+    padding: 10px;
+    max-width: 400px;
+    max-height: 300px;
+    overflow-y: auto;
+    color: #d1d4dc;
+    font-size: 12px;
+    font-family: monospace;
+    z-index: 100;
+}
+
+.diagnostics-panel h4 {
+    margin-top: 5px;
+    margin-bottom: 5px;
+    color: #787b86;
+    font-size: 13px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    padding-bottom: 3px;
+}
+
+.diagnostics-panel ul {
+    list-style-type: none;
+    padding-left: 5px;
+    margin-top: 5px;
+}
+
+.diagnostics-panel ul li {
+    margin-bottom: 3px;
+}
+
+.diagnostics-panel .error-entry {
+    color: #ef5350;
+}
+
+/* Style for diagnostics button */
+.diagnostics-toggle {
+    position: absolute;
+    bottom: 10px;
+    right: 10px;
+    background-color: rgba(30, 34, 45, 0.7);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 4px;
+    padding: 5px 10px;
+    color: #d1d4dc;
+    font-size: 12px;
+    cursor: pointer;
+    z-index: 100;
+}
+
+.diagnostics-toggle:hover {
+    background-color: rgba(30, 34, 45, 0.9);
+}
+
+/* Live update indicator styling */
+.live-indicator {
+    display: inline-flex;
+    align-items: center;
+    margin-left: 10px;
+}
+
+.pulse {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background-color: #666;
+    position: relative;
+}
+
+.pulse.active {
+    background-color: #4caf50;
+    box-shadow: 0 0 0 0 rgba(76, 175, 80, 1);
+    animation: pulse-animation 1s infinite;
+}
+
+@keyframes pulse-animation {
+    0% {
+        box-shadow: 0 0 0 0 rgba(76, 175, 80, 0.7);
+    }
+    70% {
+        box-shadow: 0 0 0 6px rgba(76, 175, 80, 0);
+    }
+    100% {
+        box-shadow: 0 0 0 0 rgba(76, 175, 80, 0);
+    }
+}
+
+/* Status bar enhancements */
+.chart-status-bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 12px;
+    padding: 4px 10px;
+    background-color: rgba(0, 0, 0, 0.6);
+    border-radius: 4px;
+    margin-top: 6px;
+    font-size: 0.85rem;
+}
+
+.chart-status-item {
+    display: flex;
+    align-items: center;
+}
+
+.status-label {
+    font-weight: bold;
+    margin-right: 4px;
+    color: #ccc;
+}
+
+.status-value {
+    color: white;
+}
+
+.status-ok {
+    color: #4caf50;
+}
+
+.status-error {
+    color: #ef5350;
+}
+
+.status-warn {
+    color: #ffc107;
+}
+
+/* Diagnostic panel enhancements */
+.diagnostic-panel {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    background-color: rgba(0, 0, 0, 0.8);
+    border: 1px solid #3f3f3f;
+    border-radius: 4px;
+    padding: 10px;
+    z-index: 10;
+    color: white;
+    font-size: 12px;
+    max-width: 300px;
+    max-height: 80vh;
+    overflow-y: auto;
+}
+
+.diagnostic-panel h3 {
+    margin-top: 0;
+    display: flex;
+    justify-content: space-between;
+    font-size: 14px;
+}
+
+.diagnostic-panel ul {
+    margin: 0;
+    padding-left: 20px;
+}
+
+.diagnostic-panel li {
+    margin-bottom: 5px;
+}
+
+.diagnostic-panel .button-group {
+    display: flex;
+    gap: 8px;
+    margin-top: 10px;
+}
+
+.diagnostic-panel button {
+    background-color: #2a2a2a;
+    border: 1px solid #3f3f3f;
+    color: white;
+    padding: 4px 8px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 12px;
+}
+
+.diagnostic-panel button:hover {
+    background-color: #3a3a3a;
 }

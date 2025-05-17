@@ -1,0 +1,642 @@
+// frontend/src/components/CandlestickChart.js
+import React, { useEffect, useRef, useState, useCallback } from 'react';
+import { createChart, CrosshairMode, CandlestickSeries } from 'lightweight-charts';
+import io from 'socket.io-client';
+import './CandlestickChart.css';
+
+// Use consistent URL format for both HTTP and WebSocket - DO NOT include trailing slash
+const FLASK_SERVER_URL = 'http://localhost:5000';
+
+// Enable socket.io debugging
+localStorage.setItem('debug', 'socket.io-client:*');
+
+// Create a global flag to track if data is being fetched to prevent duplicate requests
+let isFetchingData = false;
+
+// For logging WebSocket connection debugging messages
+const logWebSocketDebug = (message) => {
+  console.log(`[WebSocket] ${message}`);
+};
+
+function CandlestickChart() {
+    const chartContainerRef = useRef(null);
+    const chartRef = useRef(null);
+    const candlestickSeriesRef = useRef(null);
+    const socketRef = useRef(null);
+    const lastUpdateRef = useRef(null);
+    const dataLoadedRef = useRef(false);  // Track if data has been loaded
+    const timeframeRef = useRef('1m');  // Keep track of current timeframe in a ref
+
+    const [timeframe, setTimeframe] = useState('1m');
+    const [isLoading, setIsLoading] = useState(true);
+    const [error, setError] = useState(null);
+    const [isConnected, setIsConnected] = useState(false);
+    const [connectionAttempts, setConnectionAttempts] = useState(0);
+    const [lastUpdateTime, setLastUpdateTime] = useState(null);
+    const [showDiagnostics, setShowDiagnostics] = useState(false);
+    const [socketInfo, setSocketInfo] = useState({
+        id: null,
+        transport: null,
+        lastPing: null,
+        lastPong: null,
+        errors: []
+    });
+    const [debugInfo, setDebugInfo] = useState({
+        dataLoaded: false,
+        fetchCount: 0,
+        lastFetch: null
+    });
+
+    // Handler for candlestick updates - define this first
+    const handleCandleUpdate = useCallback((data) => {
+        if (!candlestickSeriesRef.current) {
+            console.warn("Received price update but candlestick series not initialized");
+            return;
+        }
+        
+        console.log("Received real-time update:", data);
+        
+        try {
+            // Ensure all values are numbers and time is properly formatted
+            // Lightweight-charts requires time in seconds for timestamps
+            const timeValue = Number(data.time);
+            
+            // Debug log the timestamp format
+            console.log(`Original timestamp: ${timeValue}, Type: ${typeof timeValue}`);
+            console.log(`Converted to date: ${new Date(timeValue * 1000).toISOString()}`);
+            
+            const formattedUpdate = {
+                // For lightweight-charts, Unix timestamp needs to be in seconds
+                time: timeValue,
+                open: Number(data.open),
+                high: Number(data.high),
+                low: Number(data.low),
+                close: Number(data.close)
+            };
+            
+            console.log("Formatted update for chart:", formattedUpdate);
+            
+            // Update the chart
+            candlestickSeriesRef.current.update(formattedUpdate);
+            
+            // Make sure the chart shows the latest data
+            if (chartRef.current) {
+                const timeScale = chartRef.current.timeScale();
+                // Get the visible time range
+                const visibleRange = timeScale.getVisibleRange();
+                
+                // If the visible range is set and the new point is after the visible range end
+                if (visibleRange && timeValue > visibleRange.to) {
+                    // Scroll the chart to show the latest point
+                    timeScale.scrollToPosition(0, true);
+                    console.log("Chart scrolled to show latest data");
+                }
+            }
+            
+            // Update the last update time
+            const currentTime = new Date();
+            setLastUpdateTime(currentTime.toLocaleTimeString());
+            lastUpdateRef.current = currentTime;
+        } catch (err) {
+            console.error("Error updating chart with real-time data:", err, data);
+        }
+    }, []);
+
+    // Fixed socket connection function
+    const setupSocketConnection = useCallback(() => {
+        try {
+            logWebSocketDebug(`Attempting to connect to WebSocket at ${FLASK_SERVER_URL}`);
+            
+            // Close any existing connection
+            if (socketRef.current) {
+                socketRef.current.disconnect();
+                socketRef.current = null;
+            }
+            
+            // Create new socket connection with explicit configuration
+            const socket = io(FLASK_SERVER_URL, {
+                reconnection: true,
+                reconnectionAttempts: 10,
+                reconnectionDelay: 1000,
+                timeout: 10000,
+                transports: ['websocket', 'polling'], // Try both transports
+                path: '/socket.io',  // Default Socket.IO path
+                withCredentials: true,
+                forceNew: true,
+                autoConnect: true,
+                reconnectionDelayMax: 5000
+            });
+            
+            // Connection event handlers
+            socket.on('connect', () => {
+                logWebSocketDebug(`Socket connected successfully with ID: ${socket.id}`);
+                setIsConnected(true);
+                setConnectionAttempts(0);
+                setError(null);
+                setSocketInfo(prev => ({
+                    ...prev,
+                    id: socket.id,
+                    transport: socket.io?.engine?.transport?.name || 'unknown',
+                    errors: []
+                }));
+                
+                // Send a ping right after connection to test bidirectional communication
+                socket.emit('ping_server', { timestamp: new Date().toISOString() });
+                logWebSocketDebug('Sent ping to server');
+            });
+            
+            socket.on('connect_error', (err) => {
+                console.error('Socket connection error:', err);
+                setIsConnected(false);
+                setConnectionAttempts(prev => prev + 1);
+                setSocketInfo(prev => ({
+                    ...prev,
+                    errors: [...prev.errors, `Connect error: ${err.message}`]
+                }));
+                
+                // Try polling transport if websocket fails
+                if (socket.io?.engine?.transport?.name === 'websocket') {
+                    logWebSocketDebug('WebSocket transport failed, trying polling...');
+                    socket.io.engine.transport.close();
+                }
+            });
+            
+            socket.on('disconnect', (reason) => {
+                console.log('Socket disconnected. Reason:', reason);
+                setIsConnected(false);
+                setSocketInfo(prev => ({
+                    ...prev,
+                    errors: [...prev.errors, `Disconnected: ${reason}`]
+                }));
+            });
+            
+            // Listen for the connection acknowledgment
+            socket.on('connection_ack', (data) => {
+                console.log('Connection acknowledged by server:', data);
+                setIsConnected(true);
+            });
+            
+            // Listen for pong responses
+            socket.on('pong_client', (data) => {
+                console.log('Received pong from server:', data);
+                // Update last update time to show communication is working
+                const currentTime = new Date();
+                setLastUpdateTime(currentTime.toLocaleTimeString());
+                lastUpdateRef.current = currentTime;
+                setSocketInfo(prev => ({
+                    ...prev,
+                    lastPong: currentTime.toLocaleTimeString()
+                }));
+            });
+            
+            // Listen for price updates
+            socket.on('price_update', handleCandleUpdate);
+            
+            // Also listen for the alternative event name
+            socket.on('candlestick', handleCandleUpdate);
+            
+            // Set up ping interval to keep the connection alive
+            const pingInterval = setInterval(() => {
+                if (socket.connected) {
+                    const now = new Date();
+                    socket.emit('ping_server', { timestamp: now.toISOString() });
+                    console.log('Sent periodic ping to server');
+                    setSocketInfo(prev => ({
+                        ...prev,
+                        lastPing: now.toLocaleTimeString()
+                    }));
+                }
+            }, 30000); // Every 30 seconds
+            
+            // Store the interval to clear it on disconnect
+            socket.pingInterval = pingInterval;
+            
+            return socket;
+        } catch (err) {
+            console.error('Socket setup error:', err);
+            setError(`Socket Error: ${err.message}`);
+            return null;
+        }
+    }, [handleCandleUpdate]);
+
+    // Fetch historical data with improved error handling and prevention of duplicate requests
+    const fetchHistoricalData = useCallback(async (selectedTimeframe) => {
+        if (!chartRef.current || !candlestickSeriesRef.current) {
+            console.warn("Chart refs not ready for fetching data");
+            return;
+        }
+        
+        // Check global fetching flag to prevent multiple simultaneous requests
+        if (isFetchingData) {
+            console.log("Already fetching data, request ignored");
+            return;
+        }
+        
+        // Prevent duplicate data loading for the same timeframe
+        if (dataLoadedRef.current && timeframeRef.current === selectedTimeframe && !isLoading) {
+            console.log(`Data already loaded for timeframe ${selectedTimeframe}, skipping fetch`);
+            return;
+        }
+        
+        // Update the timeframe ref
+        timeframeRef.current = selectedTimeframe;
+        
+        // Set loading state and fetching flag
+        setIsLoading(true);
+        isFetchingData = true;
+        setError(null);
+        
+        // Update debug info
+        setDebugInfo(prev => ({
+            ...prev,
+            fetchCount: prev.fetchCount + 1,
+            lastFetch: new Date().toLocaleTimeString()
+        }));
+        
+        console.log(`Fetching historical: ${selectedTimeframe}...`);
+        try {
+            const apiUrl = `${FLASK_SERVER_URL}/data?timeframe=${selectedTimeframe}`;
+            console.log(`Requesting data from: ${apiUrl}`);
+            
+            const response = await fetch(apiUrl, {
+                credentials: 'include', // Include credentials for session cookies
+                headers: {
+                    'Accept': 'application/json'
+                }
+            });
+            
+            if (!response.ok) {
+                let errorMsg = `HTTP ${response.status}`;
+                try { 
+                    const errorData = await response.json();
+                    errorMsg = errorData.error || errorMsg; 
+                } catch(e) {
+                    console.error("Failed to parse error response:", e);
+                }
+                throw new Error(errorMsg);
+            }
+            
+            const data = await response.json();
+            console.log(`Received ${data.length} historical points.`);
+            
+            if (data.length === 0) {
+                console.warn("Received empty data set");
+                setError("No historical data available");
+                return;
+            }
+            
+            const formattedData = data
+                .map(item => ({ 
+                    time: Number(item.time), 
+                    open: Number(item.open), 
+                    high: Number(item.high), 
+                    low: Number(item.low), 
+                    close: Number(item.close) 
+                }))
+                .sort((a, b) => a.time - b.time);
+
+            console.log("Formatted data sample:", formattedData[0]);
+            
+            // Set the data in the chart
+            candlestickSeriesRef.current.setData(formattedData);
+            console.log("Historical data set successfully.");
+            
+            // Mark data as loaded
+            dataLoadedRef.current = true;
+            setDebugInfo(prev => ({
+                ...prev,
+                dataLoaded: true
+            }));
+            
+        } catch (err) { 
+            console.error("Historical data fetch error:", err);
+            setError(`Data fetch failed: ${err.message}`);
+        } finally { 
+            setIsLoading(false);
+            // Reset the fetching flag
+            isFetchingData = false;
+        }
+    }, [isLoading]);
+
+    // Effect to clean up component on unmount
+    useEffect(() => {
+        return () => {
+            if (socketRef.current) {
+                console.log("Disconnecting socket on unmount...");
+                socketRef.current.disconnect();
+                socketRef.current = null;
+            }
+        };
+    }, []);
+
+    // Effect for chart initialization
+    useEffect(() => {
+        if (!chartContainerRef.current || chartRef.current) return;
+        
+        console.log("Initializing chart instance...");
+        try {
+            // --- Chart Options Structure ---
+            const chartOptions = {
+                width: chartContainerRef.current.clientWidth > 0 ? chartContainerRef.current.clientWidth : 600,
+                height: 600,
+                layout: {
+                    background: { type: 'solid', color: '#000000' }, 
+                    textColor: 'rgba(255, 255, 255, 0.9)',
+                    attributionLogo: false,
+                },
+                grid: {
+                    vertLines: { color: 'rgba(197, 203, 206, 0.1)' },
+                    horzLines: { color: 'rgba(197, 203, 206, 0.1)' }
+                },
+                crosshair: { mode: CrosshairMode.Normal },
+                rightPriceScale: { 
+                    borderColor: 'rgba(197, 203, 206, 0.6)',
+                    autoScale: true,  // Ensure chart auto-scales to fit data points
+                    scaleMargins: {
+                        top: 0.1,
+                        bottom: 0.1,
+                    },
+                },
+                timeScale: { 
+                    borderColor: 'rgba(197, 203, 206, 0.6)', 
+                    timeVisible: true, 
+                    secondsVisible: timeframe === '1m',
+                    rightOffset: 5,  // Add some space on the right for new points
+                    barSpacing: 10,   // Control spacing between bars
+                    fixLeftEdge: true, // Prevent scrolling beyond the loaded data
+                    lockVisibleTimeRangeOnResize: true,  // Keep the same time range on resize
+                },
+            };
+
+            const chart = createChart(chartContainerRef.current, chartOptions);
+            chartRef.current = chart;
+
+            const seriesOptions = {
+                upColor: '#26a69a', 
+                downColor: '#ef5350', 
+                borderDownColor: '#ef5350', 
+                borderUpColor: '#26a69a', 
+                wickDownColor: '#ef5350', 
+                wickUpColor: '#26a69a',
+                priceFormat: {
+                    type: 'price',
+                    precision: 2,
+                    minMove: 0.01,
+                }
+            };
+            
+            // Use the CandlestickSeries with addSeries method
+            const series = chart.addSeries(CandlestickSeries, seriesOptions);
+            candlestickSeriesRef.current = series;
+
+            console.log("Chart and series initialized successfully.");
+            
+            // Set up the time scale to automatically fit all data
+            chart.timeScale().fitContent();
+            
+            // Add debug click handler to see where user clicked on chart
+            chart.subscribeClick(param => {
+                console.log('Chart clicked:', param);
+                if (param.time) {
+                    console.log('Clicked time:', new Date(param.time * 1000).toISOString());
+                }
+            });
+
+            // Subscribe to visible range changes to debug
+            chart.timeScale().subscribeVisibleTimeRangeChange(range => {
+                if (range) {
+                    console.log('Visible range changed:', range);
+                    console.log('From:', new Date(range.from * 1000).toISOString());
+                    console.log('To:', new Date(range.to * 1000).toISOString());
+                }
+            });
+            
+            // Load initial historical data first, then connect to websocket
+            fetchHistoricalData(timeframe).then(() => {
+                // Now setup WebSocket connection after data is loaded
+                socketRef.current = setupSocketConnection();
+                
+                // After loading data and setting up websocket, fit the content
+                setTimeout(() => {
+                    chartRef.current.timeScale().fitContent();
+                    console.log("Chart fitted to content after data load");
+                }, 500);
+            });
+            
+            // Setup resize handler
+            const handleResize = () => { 
+                if (chartRef.current) {
+                    chartRef.current.applyOptions({
+                        width: chartContainerRef.current.clientWidth
+                    });
+                }
+            };
+            
+            window.addEventListener('resize', handleResize); 
+            handleResize();
+
+            // Cleanup function
+            return () => {
+                console.log("Cleaning up chart resources...");
+                window.removeEventListener('resize', handleResize);
+                
+                if (socketRef.current) {
+                    console.log("Disconnecting socket...");
+                    if (socketRef.current.pingInterval) {
+                        clearInterval(socketRef.current.pingInterval);
+                    }
+                    socketRef.current.disconnect();
+                }
+                
+                if (chartRef.current) {
+                    console.log("Removing chart...");
+                    chartRef.current.remove();
+                }
+            };
+        } catch (err) { 
+            console.error("Chart initialization error:", err);
+            setError(`Chart Init Failed: ${err.message}`); 
+            setIsLoading(false); 
+        }
+    }, [fetchHistoricalData, setupSocketConnection, timeframe]);
+
+    // Effect for handling timeframe changes - prevent infinite loops
+    useEffect(() => {
+        // Skip if not ready or already loading
+        if (!candlestickSeriesRef.current || !chartRef.current || isLoading) return;
+        
+        console.log(`Timeframe changed to ${timeframe}.`);
+        chartRef.current.timeScale().applyOptions({ 
+            secondsVisible: timeframe === '1m' 
+        });
+        
+        // Only fetch new data if timeframe actually changed
+        if (timeframeRef.current !== timeframe) {
+            console.log(`Timeframe changed from ${timeframeRef.current} to ${timeframe}. Fetching new data...`);
+            // Reset the dataLoaded flag when timeframe changes
+            dataLoadedRef.current = false;
+            fetchHistoricalData(timeframe);
+        } else {
+            console.log(`Timeframe ${timeframe} unchanged, skipping fetch.`);
+        }
+    }, [timeframe, fetchHistoricalData, isLoading, chartRef]);
+
+    // Effect to retry socket connection if needed
+    useEffect(() => {
+        if (connectionAttempts > 0 && connectionAttempts <= 3 && !isConnected) {
+            console.log(`Retrying socket connection (attempt ${connectionAttempts})...`);
+            const retryTimer = setTimeout(() => {
+                socketRef.current = setupSocketConnection();
+            }, 5000); // Wait 5 seconds between attempts
+            
+            return () => clearTimeout(retryTimer);
+        }
+    }, [connectionAttempts, isConnected, setupSocketConnection]);
+
+    // Effect to check for stale updates and reconnect if needed
+    useEffect(() => {
+        const checkConnectionInterval = setInterval(() => {
+            if (isConnected && lastUpdateRef.current) {
+                const timeSinceLastUpdate = Date.now() - lastUpdateRef.current.getTime();
+                // If no updates for more than 10 seconds, try to reconnect
+                if (timeSinceLastUpdate > 10000) {
+                    console.warn(`No updates for ${timeSinceLastUpdate}ms. Reconnecting...`);
+                    if (socketRef.current) {
+                        socketRef.current.disconnect();
+                    }
+                    socketRef.current = setupSocketConnection();
+                }
+            }
+        }, 5000);
+        
+        return () => clearInterval(checkConnectionInterval);
+    }, [isConnected, setupSocketConnection]);
+
+    // Handler for dropdown change
+    const handleTimeframeChange = (event) => { 
+        setTimeframe(event.target.value); 
+    };
+
+    // UI rendering
+    return (
+        <div className="chart-section">
+            <div className="controls">
+                <label htmlFor="timeframe">Select Timeframe:</label>
+                <select 
+                    id="timeframe" 
+                    value={timeframe} 
+                    onChange={handleTimeframeChange} 
+                    disabled={isLoading}
+                >
+                    <option value="1m">1 Minute</option>
+                    <option value="5m">5 Minutes</option>
+                    <option value="1h">1 Hour</option>
+                    <option value="4h">4 Hours</option>
+                    <option value="1d">1 Day</option>
+                    <option value="1w">1 Week</option>
+                </select>
+                
+                <span className={`status-indicator ${isConnected ? 'connected' : 'disconnected'}`}>
+                    {isConnected 
+                        ? `● Real-time Connected ${lastUpdateTime ? `(Last: ${lastUpdateTime})` : ''}` 
+                        : `○ Real-time ${connectionAttempts > 3 ? 'Failed' : 'Disconnected'}`
+                    }
+                </span>
+                
+                {isLoading && <span className="status-loading">Loading...</span>}
+                {error && <span className="status-error" title={error}>Error!</span>}
+            </div>
+            
+            <div ref={chartContainerRef} className="chart-container">
+                {/* Diagnostic panel */}
+                {showDiagnostics && (
+                    <div className="diagnostic-panel">
+                        <h3>
+                            WebSocket Diagnostics
+                            <button 
+                                className="close-button" 
+                                onClick={() => setShowDiagnostics(false)}
+                            >×</button>
+                        </h3>
+                        <ul>
+                            <li>
+                                Socket ID: {socketInfo.id || 'Not connected'}
+                            </li>
+                            <li>
+                                Transport: {socketInfo.transport || 'Unknown'}
+                            </li>
+                            <li>
+                                Connection Status: 
+                                <span className={isConnected ? 'status-good' : 'status-error'}>
+                                    {isConnected ? ' Connected' : ' Disconnected'}
+                                </span>
+                            </li>
+                            <li>
+                                Last Update: {lastUpdateTime || 'Never'}
+                            </li>
+                            <li>
+                                Last Ping: {socketInfo.lastPing || 'Never'}
+                            </li>
+                            <li>
+                                Last Pong: {socketInfo.lastPong || 'Never'}
+                            </li>
+                            <li>
+                                Current Timeframe: {timeframeRef.current}
+                            </li>
+                            <li>
+                                Data Loaded: <span className={debugInfo.dataLoaded ? 'status-good' : 'status-warn'}>
+                                    {debugInfo.dataLoaded ? 'Yes' : 'No'}
+                                </span>
+                            </li>
+                            <li>
+                                Fetch Count: {debugInfo.fetchCount}
+                            </li>
+                            <li>
+                                Last Fetch: {debugInfo.lastFetch || 'Never'}
+                            </li>
+                            {socketInfo.errors.length > 0 && (
+                                <li className="status-error">
+                                    Errors: {socketInfo.errors.slice(-3).join(', ')}
+                                </li>
+                            )}
+                        </ul>
+                        <button 
+                            onClick={() => {
+                                if (socketRef.current) {
+                                    socketRef.current.disconnect();
+                                }
+                                socketRef.current = setupSocketConnection();
+                            }}
+                        >
+                            Force Reconnect
+                        </button>
+                        <button 
+                            onClick={() => {
+                                dataLoadedRef.current = false;
+                                isFetchingData = false;
+                                fetchHistoricalData(timeframeRef.current);
+                            }}
+                            style={{marginLeft: '8px'}}
+                        >
+                            Force Refresh Data
+                        </button>
+                    </div>
+                )}
+                <button 
+                    className="diagnostic-toggle" 
+                    onClick={() => setShowDiagnostics(!showDiagnostics)}
+                >
+                    {showDiagnostics ? 'Hide Diagnostics' : 'Show Diagnostics'}
+                </button>
+            </div>
+            
+            {!isLoading && error && !chartRef.current && (
+                <div className="chart-placeholder-error">
+                    Could not load chart. {error}
+                </div>
+            )}
+        </div>
+    );
+}
+
+export default CandlestickChart;

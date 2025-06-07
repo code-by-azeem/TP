@@ -190,7 +190,7 @@ const Dashboard = () => {
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
             </svg>
-            Chart
+            <span>Chart</span>
           </button>
           <button 
             className={`tab-button ${activeTab === 'account' ? 'active' : ''}`} 
@@ -201,7 +201,7 @@ const Dashboard = () => {
               <line x1="8" y1="21" x2="16" y2="21"></line>
               <line x1="12" y1="17" x2="12" y2="21"></line>
             </svg>
-            Account Info
+            <span>Account Info</span>
           </button>
           <button 
             className={`tab-button ${activeTab === 'history' ? 'active' : ''}`} 
@@ -211,7 +211,7 @@ const Dashboard = () => {
               <circle cx="12" cy="12" r="10"></circle>
               <polyline points="12 6 12 12 16 14"></polyline>
             </svg>
-            Trade History
+            <span>Trade History</span>
           </button>
         </div>
         

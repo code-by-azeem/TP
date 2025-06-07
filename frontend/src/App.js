@@ -7,13 +7,11 @@ import Dashboard from './components/Dashboard';
 function App() {
   return (
     <BrowserRouter>
-      <div className="centered-bg-wrapper">
-        <div className="centered-content">
-          <Routes>
-            <Route path="/" element={<AuthPage />} />
-            <Route path="/dashboard" element={<Dashboard />} />
-          </Routes>
-        </div>
+      <div className="app">
+        <Routes>
+          <Route path="/" element={<AuthPage />} />
+          <Route path="/dashboard" element={<Dashboard />} />
+        </Routes>
       </div>
     </BrowserRouter>
   );

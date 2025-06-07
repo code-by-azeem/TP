@@ -167,8 +167,10 @@ const AuthPage = () => {
   };
 
   return (
-    <div className="auth-container">
-      <h2>{isLogin ? 'Login' : 'Sign Up'}</h2>
+    <div className="centered-auth-wrapper">
+      <div className="centered-content">
+        <div className="auth-container">
+          <h2>{isLogin ? 'Login' : 'Sign Up'}</h2>
       <form onSubmit={handleSubmit}>
         <input
           type="text"
@@ -209,6 +211,8 @@ const AuthPage = () => {
         type={modalConfig.type}
         autoCloseDelay={modalConfig.autoCloseDelay}
       />
+        </div>
+      </div>
     </div>
   );
 };

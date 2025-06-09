@@ -15,15 +15,19 @@ const TradeHistory = () => {
         });
         
         if (!response.ok) {
+          if (response.status === 503) {
+            throw new Error('MT5 connection not available. Please ensure MT5 is running and connected.');
+          }
           throw new Error(`HTTP error! Status: ${response.status}`);
         }
         
         const data = await response.json();
+        console.log("MT5 Trade history data received:", data); // Debug log
         setTrades(data);
         setError(null);
       } catch (error) {
         console.error('Error fetching trade history:', error);
-        setError('Failed to load trade history. Please try again later.');
+        setError(error.message || 'Failed to load trade history from MT5. Please try again later.');
       } finally {
         setIsLoading(false);
       }
@@ -34,6 +38,7 @@ const TradeHistory = () => {
 
   // Format currency with 2 decimal places
   const formatCurrency = (value) => {
+    if (value === undefined || value === null) return '$0.00';
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
       currency: 'USD',
@@ -49,6 +54,18 @@ const TradeHistory = () => {
     } catch (e) {
       return dateString;
     }
+  };
+
+  // Format volume
+  const formatVolume = (volume) => {
+    return parseFloat(volume || 0).toFixed(2);
+  };
+
+  // Format percentage change
+  const formatChangePercent = (change) => {
+    if (change === undefined || change === null) return '0.00%';
+    const value = parseFloat(change);
+    return `${value >= 0 ? '+' : ''}${value.toFixed(2)}%`;
   };
 
   if (isLoading) {
@@ -95,32 +112,91 @@ const TradeHistory = () => {
             <thead>
               <tr>
                 <th>ID</th>
-                <th>Date & Time</th>
-                <th>Symbol</th>
-                <th>Type</th>
-                <th>Volume</th>
-                <th>Price</th>
-                <th>Profit/Loss</th>
+                <th>DATE & TIME</th>
+                <th>SYMBOL</th>
+                <th>TYPE</th>
+                <th>VOLUME</th>
+                <th>PRICE</th>
+                <th>S / L</th>
+                <th>T / P</th>
+                <th>TIME</th>
+                <th>PRICE</th>
+                <th>PROFIT</th>
+                <th>CHANGE</th>
               </tr>
             </thead>
             <tbody>
               {trades.map((trade) => (
-                <tr key={trade.id} className={trade.profit >= 0 ? 'profit-row' : 'loss-row'}>
-                  <td>{trade.id}</td>
-                  <td>{formatDate(trade.timestamp)}</td>
-                  <td>{trade.symbol}</td>
+                <tr key={trade.id || trade.ticket} className={`${trade.profit >= 0 ? 'profit-row' : 'loss-row'} ${trade.is_open ? 'open-position' : 'closed-position'}`}>
+                  <td>{trade.id || trade.ticket}</td>
+                  <td>{formatDate(trade.timestamp || trade.time)}</td>
+                  <td className="symbol-cell">
+                    {trade.symbol}
+                    {trade.is_open && <span className="open-badge">OPEN</span>}
+                  </td>
                   <td className={trade.type === 'BUY' ? 'buy-type' : 'sell-type'}>
                     {trade.type}
                   </td>
-                  <td>{trade.volume}</td>
-                  <td>{formatCurrency(trade.price)}</td>
+                  <td>{formatVolume(trade.volume)}</td>
+                  <td>{formatCurrency(trade.price || trade.entry_price)}</td>
+                  <td>{trade.sl && trade.sl > 0 ? formatCurrency(trade.sl) : '0.00'}</td>
+                  <td>{trade.tp && trade.tp > 0 ? formatCurrency(trade.tp) : '0.00'}</td>
+                  <td>
+                    {trade.close_time ? formatDate(trade.close_time) : 
+                     trade.is_open ? 'Open' : formatDate(trade.timestamp || trade.time)}
+                  </td>
+                  <td>{formatCurrency(trade.exit_price || trade.current_price || trade.price || trade.entry_price)}</td>
                   <td className={trade.profit >= 0 ? 'profit' : 'loss'}>
                     {formatCurrency(trade.profit)}
+                  </td>
+                  <td className={trade.change_percent >= 0 ? 'profit' : 'loss'}>
+                    {formatChangePercent(trade.change_percent)}
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
+          
+          {/* Additional Trade Details Section */}
+          <div className="trade-details-summary">
+            <h3>Trade Summary</h3>
+            <div className="summary-grid">
+              <div className="summary-item">
+                <span className="label">Total Trades:</span>
+                <span className="value">{trades.length}</span>
+              </div>
+              <div className="summary-item">
+                <span className="label">Profitable Trades:</span>
+                <span className="value profit">{trades.filter(t => (t.profit || 0) > 0).length}</span>
+              </div>
+              <div className="summary-item">
+                <span className="label">Losing Trades:</span>
+                <span className="value loss">{trades.filter(t => (t.profit || 0) < 0).length}</span>
+              </div>
+              <div className="summary-item">
+                <span className="label">Total Profit/Loss:</span>
+                <span className={`value ${trades.reduce((sum, t) => sum + (t.profit || 0), 0) >= 0 ? 'profit' : 'loss'}`}>
+                  {formatCurrency(trades.reduce((sum, t) => sum + (t.profit || 0), 0))}
+                </span>
+              </div>
+              {trades.some(t => t.commission) && (
+                <div className="summary-item">
+                  <span className="label">Total Commission:</span>
+                  <span className="value">
+                    {formatCurrency(trades.reduce((sum, t) => sum + (t.commission || 0), 0))}
+                  </span>
+                </div>
+              )}
+              {trades.some(t => t.swap) && (
+                <div className="summary-item">
+                  <span className="label">Total Swap:</span>
+                  <span className="value">
+                    {formatCurrency(trades.reduce((sum, t) => sum + (t.swap || 0), 0))}
+                  </span>
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       )}
     </div>

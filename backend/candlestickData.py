@@ -108,7 +108,11 @@ socketio = SocketIO(
 )
 log.info(f"Flask-SocketIO initialized with transports: {socketio.server.eio.transports}")
 
-users = {}  # username: password (for demo only)
+# --- Simple user management for web app access (separate from MT5 authentication) ---
+# MT5 handles its own authentication via mt5.initialize(), but we need web app login
+users = {
+    'mohib': 'mohib'  # Pre-create your user account
+}
 
 # Renamed to avoid conflict if 'timeframes' is used as a local variable elsewhere
 timeframes_mt5_constants = {
@@ -522,85 +526,9 @@ def status():
         "timestamp": datetime.now().isoformat()
     })
 
-# --- Add missing account endpoint ---
-@app.route('/account/<int:id>', methods=['GET'])
-def get_account(id):
-    log.info(f"Received request for account info for ID: {id}")
-    
-    # Check if user is authenticated
-    if 'username' not in session:
-        log.warning("Unauthorized account info request")
-        return jsonify({"error": "Unauthorized"}), 401
-    
-    try:
-        # Generate sample account data (replace with real MT5 data in production)
-        account_data = {
-            "id": id,
-            "username": session['username'],
-            "balance": 10000.00,
-            "equity": 10235.75,
-            "margin": 250.50,
-            "freeMargin": 9750.25,
-            "marginLevel": 95.5,
-            "profit": 235.75,
-            "currency": "USD",
-            "leverage": "1:100",
-            "lastUpdate": datetime.now().isoformat()
-        }
-        
-        return jsonify(account_data)
-    except Exception as e:
-        log.error(f"Error fetching account info: {e}", exc_info=True)
-        return jsonify({"error": "Failed to fetch account information"}), 500
+# --- Removed duplicate endpoint - using /account instead ---
 
-# --- Add missing trade history endpoint ---
-@app.route('/trade-history/<int:id>', methods=['GET'])
-def get_trade_history(id):
-    log.info(f"Received request for trade history for ID: {id}")
-    
-    # Check if user is authenticated
-    if 'username' not in session:
-        log.warning("Unauthorized trade history request")
-        return jsonify({"error": "Unauthorized"}), 401
-    
-    try:
-        # Generate sample trade history data (replace with real MT5 data in production)
-        current_time = datetime.now()
-        
-        trades = [
-            {
-                "id": 1001,
-                "symbol": "ETHUSD",
-                "type": "BUY",
-                "volume": 0.1,
-                "price": 3250.75,
-                "profit": 125.50,
-                "timestamp": (current_time - timedelta(hours=5)).isoformat()
-            },
-            {
-                "id": 1002,
-                "symbol": "BTCUSD",
-                "type": "SELL",
-                "volume": 0.05,
-                "price": 65432.25,
-                "profit": -45.25,
-                "timestamp": (current_time - timedelta(hours=2)).isoformat()
-            },
-            {
-                "id": 1003,
-                "symbol": "XAUUSD",
-                "type": "BUY",
-                "volume": 0.2,
-                "price": 2345.80,
-                "profit": 75.40,
-                "timestamp": (current_time - timedelta(minutes=30)).isoformat()
-            }
-        ]
-        
-        return jsonify(trades)
-    except Exception as e:
-        log.error(f"Error fetching trade history: {e}", exc_info=True)
-        return jsonify({"error": "Failed to fetch trade history"}), 500
+# --- Removed duplicate endpoint - using /trade-history instead ---
 
 # --- MODIFIED /data Route with enhanced rate limiting ---
 @app.route('/data')
@@ -959,82 +887,224 @@ def auth_check():
         return jsonify({'authenticated': True, 'username': session['username']})
     return jsonify({'authenticated': False})
 
-# --- Added simple account endpoint without ID ---
+# --- MT5 Account endpoint - Returns data from connected MT5 account ---
 @app.route('/account', methods=['GET'])
-def get_default_account():
-    log.info("Received request for default account info")
+def get_account():
+    log.info("Received request for MT5 account info")
     
-    # Check if user is authenticated
+    # Simple session check for web app access
     if 'username' not in session:
-        log.warning("Unauthorized account info request")
-        return jsonify({"error": "Unauthorized"}), 401
+        log.warning("Unauthorized account info request - please login first")
+        return jsonify({"error": "Please login to access account information"}), 401
     
     try:
-        # Generate sample account data (replace with real MT5 data in production)
+        # Check MT5 connection
+        if not is_mt5_connected():
+            log.warning("MT5 not connected for account info request")
+            return jsonify({"error": "MT5 connection not available"}), 503
+        
+        # Get real account data from MT5 - this returns data for the connected account
+        account_info = mt5.account_info()
+        if account_info is None:
+            log.error(f"Failed to get account info from MT5: {mt5.last_error()}")
+            return jsonify({"error": "Failed to retrieve account information from MT5"}), 500
+        
+        # Debug: Log all available account_info attributes
+        log.info(f"MT5 account_info available attributes: {dir(account_info)}")
+        
+        # Build account data using REAL MT5 account ID and information
         account_data = {
-            "id": 1,  # Default ID
-            "username": session['username'],
-            "balance": 10000.00,
-            "equity": 10235.75,
-            "margin": 250.50,
-            "freeMargin": 9750.25,
-            "marginLevel": 95.5,
-            "profit": 235.75,
-            "currency": "USD",
-            "leverage": "1:100",
+            "id": int(getattr(account_info, 'login', 0)),  # Use REAL MT5 account login as ID
+            "username": session.get('username', getattr(account_info, 'name', 'MT5 User')),  # Use session username, fallback to MT5 name
             "lastUpdate": datetime.now().isoformat()
         }
         
+        # List of all known MT5 account_info fields
+        all_mt5_fields = [
+            'login', 'trade_mode', 'leverage', 'limit_orders', 'margin_so_mode',
+            'trade_allowed', 'trade_expert', 'margin_so_call', 'margin_so_so',
+            'currency', 'balance', 'credit', 'profit', 'equity', 'margin',
+            'margin_free', 'margin_level', 'margin_call', 'margin_stop_out',
+            'margin_initial', 'margin_maintenance', 'assets', 'liabilities',
+            'commission_blocked', 'name', 'server', 'company'
+        ]
+        
+        # Extract all available fields from MT5 account_info
+        for field in all_mt5_fields:
+            if hasattr(account_info, field):
+                value = getattr(account_info, field)
+                # Convert to appropriate type and add to account_data
+                if field in ['balance', 'credit', 'profit', 'equity', 'margin', 'margin_free', 
+                           'margin_level', 'margin_call', 'margin_stop_out', 'margin_initial', 
+                           'margin_maintenance', 'assets', 'liabilities', 'commission_blocked']:
+                    account_data[field] = float(value) if value is not None else 0.0
+                elif field == 'leverage':
+                    account_data[field] = f"1:{int(value)}" if value is not None else "1:100"
+                elif field in ['trade_allowed', 'trade_expert']:
+                    account_data[field] = bool(value) if value is not None else False
+                elif field in ['login', 'limit_orders', 'margin_so_mode', 'trade_mode']:
+                    account_data[field] = int(value) if value is not None else 0
+                else:
+                    # String fields like name, server, company, currency
+                    account_data[field] = str(value) if value is not None else ""
+                
+                log.info(f"MT5 field '{field}': {account_data[field]} (type: {type(value).__name__})")
+            else:
+                log.debug(f"MT5 field '{field}' not available on this account")
+        
+        # Add aliases for frontend compatibility
+        if 'margin_free' in account_data:
+            account_data['freeMargin'] = account_data['margin_free']
+        if 'margin_level' in account_data:
+            account_data['marginLevel'] = account_data['margin_level']
+        
+        log.info(f"Successfully retrieved MT5 account info for login: {account_data.get('login', 'N/A')}")
+        log.info(f"Total account data fields: {len(account_data)} - {list(account_data.keys())}")
         return jsonify(account_data)
+        
     except Exception as e:
         log.error(f"Error fetching account info: {e}", exc_info=True)
         return jsonify({"error": "Failed to fetch account information"}), 500
 
-# --- Added simple trade-history endpoint without ID ---
+# --- MT5 Trade History endpoint - Returns data from connected MT5 account ---
 @app.route('/trade-history', methods=['GET'])
-def get_default_trade_history():
-    log.info("Received request for default trade history")
+def get_trade_history():
+    log.info("Received request for MT5 trade history")
     
-    # Check if user is authenticated
+    # Simple session check for web app access
     if 'username' not in session:
-        log.warning("Unauthorized trade history request")
-        return jsonify({"error": "Unauthorized"}), 401
+        log.warning("Unauthorized trade history request - please login first")
+        return jsonify({"error": "Please login to access trade history"}), 401
     
     try:
-        # Generate sample trade history data (replace with real MT5 data in production)
-        current_time = datetime.now()
+        # Check MT5 connection
+        if not is_mt5_connected():
+            log.warning("MT5 not connected for trade history request")
+            return jsonify({"error": "MT5 connection not available"}), 503
         
-        trades = [
-            {
-                "id": 1001,
-                "symbol": "ETHUSD",
-                "type": "BUY",
-                "volume": 0.1,
-                "price": 3250.75,
-                "profit": 125.50,
-                "timestamp": (current_time - timedelta(hours=5)).isoformat()
-            },
-            {
-                "id": 1002,
-                "symbol": "BTCUSD",
-                "type": "SELL",
-                "volume": 0.05,
-                "price": 65432.25,
-                "profit": -45.25,
-                "timestamp": (current_time - timedelta(hours=2)).isoformat()
-            },
-            {
-                "id": 1003,
-                "symbol": "XAUUSD",
-                "type": "BUY",
-                "volume": 0.2,
-                "price": 2345.80,
-                "profit": 75.40,
-                "timestamp": (current_time - timedelta(minutes=30)).isoformat()
-            }
-        ]
+        # Set date range for the last 30 days
+        date_to = datetime.now()
+        date_from = date_to - timedelta(days=30)
+        
+        log.info(f"Fetching MT5 trade history from {date_from} to {date_to}")
+        
+        # Get complete position history using history_positions_total and history_positions_get
+        # This gives us complete closed positions, not just individual deals
+        positions_total = mt5.history_positions_total(date_from, date_to)
+        log.info(f"Found {positions_total} total positions in history")
+        
+        if positions_total == 0:
+            log.info("No closed positions found, checking for open positions only")
+        
+        # Get all closed positions in the time range
+        closed_positions = []
+        if positions_total > 0:
+            closed_positions = mt5.history_positions_get(date_from, date_to)
+            if closed_positions is None:
+                log.error(f"Failed to get position history from MT5: {mt5.last_error()}")
+                closed_positions = []
+            else:
+                log.info(f"Retrieved {len(closed_positions)} closed positions")
+        
+        # Get current open positions to add to the list
+        current_positions = mt5.positions_get()
+        if current_positions is None:
+            current_positions = []
+        
+        log.info(f"Found {len(current_positions)} current open positions")
+        
+        # Combine closed and open positions
+        all_positions = list(closed_positions) + list(current_positions)
+        
+        if len(all_positions) == 0:
+            log.info("No positions found in MT5 account")
+            return jsonify([])
+        
+        # Convert positions to trade format with proper profit calculation
+        trades = []
+        for position in all_positions:
+            try:
+                # Convert position type to readable format
+                position_type = "BUY" if position.type == mt5.POSITION_TYPE_BUY else "SELL"
+                
+                # Get position timestamps
+                open_time = datetime.fromtimestamp(position.time) if hasattr(position, 'time') else datetime.now()
+                close_time = datetime.fromtimestamp(position.time_update) if hasattr(position, 'time_update') else None
+                
+                # Calculate real profit
+                real_profit = float(getattr(position, 'profit', 0))
+                swap = float(getattr(position, 'swap', 0))
+                commission = float(getattr(position, 'commission', 0))
+                total_profit = real_profit + swap + commission
+                
+                # Get SL and TP
+                sl = float(getattr(position, 'sl', 0))
+                tp = float(getattr(position, 'tp', 0))
+                
+                # Get prices
+                open_price = float(getattr(position, 'price_open', 0))
+                current_price = float(getattr(position, 'price_current', open_price))
+                
+                # For closed positions, use close price if available
+                close_price = 0.0
+                if hasattr(position, 'price_close') and position.price_close > 0:
+                    close_price = float(position.price_close)
+                    current_price = close_price
+                
+                # Calculate percentage change
+                change_percent = 0.0
+                if open_price > 0 and current_price > 0:
+                    if position_type == "BUY":
+                        change_percent = ((current_price - open_price) / open_price) * 100
+                    else:  # SELL
+                        change_percent = ((open_price - current_price) / open_price) * 100
+                
+                # Determine if position is still open (closed positions have a 'reason')
+                is_open = not hasattr(position, 'reason') or getattr(position, 'reason', None) is None
+                
+                trade_data = {
+                    "id": int(getattr(position, 'ticket', 0)),
+                    "ticket": int(getattr(position, 'ticket', 0)),
+                    "timestamp": open_time.isoformat(),
+                    "time": open_time.isoformat(),
+                    "close_time": close_time.isoformat() if close_time else None,
+                    "symbol": getattr(position, 'symbol', ''),
+                    "type": position_type,
+                    "volume": float(getattr(position, 'volume', 0)),
+                    "price": open_price,
+                    "entry_price": open_price,
+                    "exit_price": close_price if close_price > 0 else current_price,
+                    "current_price": current_price,
+                    "sl": sl,
+                    "tp": tp,
+                    "profit": total_profit,
+                    "raw_profit": real_profit,
+                    "commission": commission,
+                    "swap": swap,
+                    "change_percent": change_percent,
+                    "comment": getattr(position, 'comment', ''),
+                    "identifier": getattr(position, 'identifier', None),
+                    "reason": getattr(position, 'reason', None),
+                    "is_open": is_open
+                }
+                
+                trades.append(trade_data)
+                log.info(f"Position {trade_data['ticket']}: {position_type} {trade_data['volume']} {trade_data['symbol']} "
+                        f"at {open_price}, profit: {total_profit}, change: {change_percent:.2f}%, open: {is_open}")
+                
+            except Exception as position_error:
+                log.error(f"Error processing position {getattr(position, 'ticket', 'unknown')}: {position_error}")
+                continue
+        
+        # Sort trades by time (newest first)
+        trades.sort(key=lambda x: x['timestamp'], reverse=True)
+        
+        log.info(f"Successfully retrieved {len(trades)} trades from MT5 account")
+        log.info(f"Open positions: {len([t for t in trades if t['is_open']])}, "
+                f"Closed positions: {len([t for t in trades if not t['is_open']])}")
         
         return jsonify(trades)
+        
     except Exception as e:
         log.error(f"Error fetching trade history: {e}", exc_info=True)
         return jsonify({"error": "Failed to fetch trade history"}), 500

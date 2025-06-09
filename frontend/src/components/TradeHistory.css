@@ -89,6 +89,7 @@
     width: 100%;
     border-collapse: collapse;
     color: white;
+    min-width: 1200px; /* Ensure enough width for all columns */
 }
 
 .trades-table thead tr {
@@ -97,13 +98,19 @@
 }
 
 .trades-table th {
-    padding: 12px 15px;
-    text-align: left;
-    font-weight: 500;
-    font-size: 0.9rem;
+    padding: 12px 8px;
+    text-align: center;
+    font-weight: 600;
+    font-size: 0.8rem;
     text-transform: uppercase;
-    letter-spacing: 1px;
-    color: rgba(255, 255, 255, 0.7);
+    letter-spacing: 0.5px;
+    color: rgba(255, 255, 255, 0.8);
+    white-space: nowrap;
+    border-right: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.trades-table th:last-child {
+    border-right: none;
 }
 
 .trades-table tbody tr {
@@ -113,24 +120,65 @@
 
 .trades-table tbody tr:hover {
     background: rgba(63, 169, 245, 0.1);
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
 }
 
 .trades-table td {
-    padding: 12px 15px;
-    font-size: 0.95rem;
+    padding: 10px 8px;
+    font-size: 0.85rem;
+    text-align: center;
+    white-space: nowrap;
+    border-right: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.trades-table td:last-child {
+    border-right: none;
 }
 
 /* Trade types */
 .buy-type {
     color: #4CAF50;
     font-weight: 600;
+    background: rgba(76, 175, 80, 0.1);
+    padding: 4px 8px;
+    border-radius: 4px;
 }
 
 .sell-type {
     color: #EF5350;
     font-weight: 600;
+    background: rgba(239, 83, 80, 0.1);
+    padding: 4px 8px;
+    border-radius: 4px;
+}
+
+/* Symbol cell with open badge */
+.symbol-cell {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+}
+
+.open-badge {
+    background: linear-gradient(135deg, #4CAF50, #66BB6A);
+    color: white;
+    font-size: 0.65rem;
+    font-weight: 700;
+    padding: 2px 6px;
+    border-radius: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0% { box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2); }
+    50% { box-shadow: 0 2px 8px rgba(76, 175, 80, 0.4); }
+    100% { box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2); }
 }
 
 /* Profit/Loss */
@@ -142,6 +190,66 @@
 .loss {
     color: #EF5350;
     font-weight: 600;
+}
+
+.profit-row {
+    border-left: 3px solid #4CAF50;
+}
+
+.loss-row {
+    border-left: 3px solid #EF5350;
+}
+
+.open-position {
+    background: rgba(76, 175, 80, 0.05);
+    border-left: 3px solid #4CAF50;
+}
+
+.closed-position {
+    opacity: 0.9;
+}
+
+/* Trade Summary Section */
+.trade-details-summary {
+    margin-top: 30px;
+    padding: 20px;
+    background: rgba(15, 23, 42, 0.3);
+    border-radius: 8px;
+    border: 1px solid rgba(63, 169, 245, 0.2);
+}
+
+.trade-details-summary h3 {
+    color: #3FA9F5;
+    margin-bottom: 15px;
+    font-size: 1.2rem;
+    text-align: center;
+}
+
+.summary-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 15px;
+}
+
+.summary-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 15px;
+    background: rgba(42, 46, 57, 0.5);
+    border-radius: 6px;
+    border-left: 3px solid #3FA9F5;
+}
+
+.summary-item .label {
+    color: #787b86;
+    font-size: 0.9rem;
+    font-weight: 500;
+}
+
+.summary-item .value {
+    font-weight: 600;
+    font-size: 1rem;
 }
 
 /* Enhanced responsive styling */
@@ -157,22 +265,33 @@
         margin-bottom: 15px;
     }
     
-    .trades-table th,
-    .trades-table td {
-        padding: 8px 6px;
-        font-size: 0.8rem;
+    .trades-table {
+        min-width: 800px; /* Reduced for mobile but still scrollable */
     }
     
-    .trades-table th:nth-child(1),
-    .trades-table td:nth-child(1),
-    .trades-table th:nth-child(3),
-    .trades-table td:nth-child(3) {
-        display: none; /* Hide ID and additional columns on very small screens */
+    .trades-table th,
+    .trades-table td {
+        padding: 8px 4px;
+        font-size: 0.75rem;
+    }
+    
+    .symbol-cell {
+        flex-direction: column;
+        gap: 4px;
+    }
+    
+    .open-badge {
+        font-size: 0.6rem;
+        padding: 1px 4px;
     }
     
     .trades-table-container {
         margin: 0 -5px;
         padding: 0 5px;
+    }
+    
+    .summary-grid {
+        grid-template-columns: 1fr;
     }
 }
 
@@ -182,21 +301,28 @@
         padding: 15px 10px;
     }
     
-    .trades-table th,
-    .trades-table td {
-        padding: 10px 8px;
-        font-size: 0.85rem;
+    .trades-table {
+        min-width: 1000px;
     }
     
-    .trades-table th:nth-child(1),
-    .trades-table td:nth-child(1) {
-        display: none; /* Hide ID column on small screens */
+    .trades-table th,
+    .trades-table td {
+        padding: 8px 6px;
+        font-size: 0.8rem;
+    }
+    
+    .summary-grid {
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
     }
 }
 
 @media (max-width: 992px) {
     .trade-history-container {
         margin: 15px 0;
+    }
+    
+    .summary-grid {
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
     }
 }
 

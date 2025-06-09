@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import TradeHistory from './TradeHistory';
+import AccountInfo from './AccountInfo';
 import CandlestickChart from './CandlestickChart';
 import './Dashboard.css';
 
@@ -48,13 +49,25 @@ const Dashboard = () => {
   const fetchAccountData = async () => {
     setIsLoading(true);
     try {
-      const response = await fetch('http://localhost:5000/account/1', {
+      const response = await fetch('http://localhost:5000/account', {
         credentials: 'include',
       });
       
       if (response.ok) {
         const data = await response.json();
-        setAccountData(data);
+        // Map MT5 fields to our expected format
+        setAccountData({
+          id: data.login || data.id,
+          balance: data.balance || 0,
+          equity: data.equity || 0,
+          margin: data.margin || 0,
+          freeMargin: data.margin_free || data.freeMargin || 0,
+          profit: data.profit || 0,
+          marginLevel: data.margin_level || data.marginLevel || 0,
+          currency: data.currency || 'USD',
+          leverage: data.leverage || '1:100',
+          lastUpdate: data.lastUpdate || new Date().toISOString()
+        });
       }
     } catch (error) {
       console.error('Error fetching account data:', error);
@@ -96,59 +109,7 @@ const Dashboard = () => {
   };
   
   // Render account details tab content
-  const renderAccountDetails = () => (
-    <div className="account-details-container">
-      <h2>Account Details</h2>
-      <div className="account-details">
-        <div className="account-detail-item">
-          <label>Account ID:</label>
-          <span>{accountData.id || '—'}</span>
-        </div>
-        <div className="account-detail-item">
-          <label>Username:</label>
-          <span>{username}</span>
-        </div>
-        <div className="account-detail-item">
-          <label>Balance:</label>
-          <span>{isLoading ? '—' : formatCurrency(accountData.balance)}</span>
-        </div>
-        <div className="account-detail-item">
-          <label>Equity:</label>
-          <span>{isLoading ? '—' : formatCurrency(accountData.equity)}</span>
-        </div>
-        <div className="account-detail-item">
-          <label>Margin:</label>
-          <span>{isLoading ? '—' : formatCurrency(accountData.margin)}</span>
-        </div>
-        <div className="account-detail-item">
-          <label>Free Margin:</label>
-          <span>{isLoading ? '—' : formatCurrency(accountData.freeMargin)}</span>
-        </div>
-        <div className="account-detail-item">
-          <label>Margin Level:</label>
-          <span>{isLoading ? '—' : `${accountData.marginLevel}%`}</span>
-        </div>
-        <div className="account-detail-item">
-          <label>Profit/Loss:</label>
-          <span className={accountData.profit >= 0 ? 'profit' : 'loss'}>
-            {isLoading ? '—' : formatCurrency(accountData.profit)}
-          </span>
-        </div>
-        <div className="account-detail-item">
-          <label>Currency:</label>
-          <span>{accountData.currency || 'USD'}</span>
-        </div>
-        <div className="account-detail-item">
-          <label>Leverage:</label>
-          <span>{accountData.leverage || '1:100'}</span>
-        </div>
-        <div className="account-detail-item">
-          <label>Last Updated:</label>
-          <span>{accountData.lastUpdate ? new Date(accountData.lastUpdate).toLocaleString() : '—'}</span>
-        </div>
-      </div>
-    </div>
-  );
+  const renderAccountDetails = () => <AccountInfo />;
 
   // Determine what content to show based on active tab
   const renderTabContent = () => {

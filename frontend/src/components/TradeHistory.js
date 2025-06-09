@@ -17,6 +17,11 @@ const TradeHistory = () => {
         if (!response.ok) {
           if (response.status === 503) {
             throw new Error('MT5 connection not available. Please ensure MT5 is running and connected.');
+          } else if (response.status === 500) {
+            const errorData = await response.json().catch(() => ({}));
+            throw new Error(errorData.error || 'Server error occurred while fetching trade history.');
+          } else if (response.status === 401) {
+            throw new Error('Please login again to access trade history.');
           }
           throw new Error(`HTTP error! Status: ${response.status}`);
         }
@@ -139,8 +144,8 @@ const TradeHistory = () => {
                   </td>
                   <td>{formatVolume(trade.volume)}</td>
                   <td>{formatCurrency(trade.price || trade.entry_price)}</td>
-                  <td>{trade.sl && trade.sl > 0 ? formatCurrency(trade.sl) : '0.00'}</td>
-                  <td>{trade.tp && trade.tp > 0 ? formatCurrency(trade.tp) : '0.00'}</td>
+                  <td>{trade.sl && trade.sl > 0 ? formatCurrency(trade.sl) : '—'}</td>
+                  <td>{trade.tp && trade.tp > 0 ? formatCurrency(trade.tp) : '—'}</td>
                   <td>
                     {trade.close_time ? formatDate(trade.close_time) : 
                      trade.is_open ? 'Open' : formatDate(trade.timestamp || trade.time)}

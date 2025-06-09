@@ -988,48 +988,136 @@ def get_trade_history():
         
         log.info(f"Fetching MT5 trade history from {date_from} to {date_to}")
         
-        # Get complete position history using history_positions_total and history_positions_get
-        # This gives us complete closed positions, not just individual deals
-        positions_total = mt5.history_positions_total(date_from, date_to)
-        log.info(f"Found {positions_total} total positions in history")
-        
-        if positions_total == 0:
-            log.info("No closed positions found, checking for open positions only")
-        
-        # Get all closed positions in the time range
-        closed_positions = []
-        if positions_total > 0:
-            closed_positions = mt5.history_positions_get(date_from, date_to)
-            if closed_positions is None:
-                log.error(f"Failed to get position history from MT5: {mt5.last_error()}")
-                closed_positions = []
+        # Get historical deals (completed trades) using history_deals_get
+        deals = []
+        try:
+            deals = mt5.history_deals_get(date_from, date_to)
+            if deals is None:
+                log.warning(f"No deals returned from MT5: {mt5.last_error()}")
+                deals = []
             else:
-                log.info(f"Retrieved {len(closed_positions)} closed positions")
+                log.info(f"Retrieved {len(deals)} historical deals from {date_from.date()} to {date_to.date()}")
+        except Exception as e:
+            log.error(f"Error fetching deals: {e}", exc_info=True)
+            deals = []
         
         # Get current open positions to add to the list
-        current_positions = mt5.positions_get()
-        if current_positions is None:
+        current_positions = []
+        try:
+            current_positions = mt5.positions_get()
+            if current_positions is None:
+                current_positions = []
+            log.info(f"Found {len(current_positions)} current open positions")
+        except Exception as e:
+            log.error(f"Error fetching open positions: {e}")
             current_positions = []
         
-        log.info(f"Found {len(current_positions)} current open positions")
+        # Group deals by position to get complete trades
+        # Process deals to create closed trades
+        closed_trades = []
+        open_trades = []  # Initialize open_trades list
+        deal_groups = {}
         
-        # Combine closed and open positions
-        all_positions = list(closed_positions) + list(current_positions)
+        # Group deals by position_id to form complete trades
+        for deal in deals:
+            try:
+                position_id = getattr(deal, 'position_id', 0)
+                if position_id not in deal_groups:
+                    deal_groups[position_id] = []
+                deal_groups[position_id].append(deal)
+            except Exception as e:
+                log.error(f"Error processing deal {getattr(deal, 'ticket', 'unknown')}: {e}")
+                continue
         
-        if len(all_positions) == 0:
-            log.info("No positions found in MT5 account")
-            return jsonify([])
+        # Convert deal groups to trades
+        for position_id, position_deals in deal_groups.items():
+            if len(position_deals) >= 2:  # At least entry and exit
+                try:
+                    # Sort deals by time
+                    position_deals.sort(key=lambda d: getattr(d, 'time', 0))
+                    
+                    entry_deal = position_deals[0]
+                    exit_deal = position_deals[-1]
+                    
+                    # Calculate total profit from all deals in this position
+                    total_profit = sum(float(getattr(d, 'profit', 0)) for d in position_deals)
+                    total_commission = sum(float(getattr(d, 'commission', 0)) for d in position_deals)
+                    total_swap = sum(float(getattr(d, 'swap', 0)) for d in position_deals)
+                    
+                    # Determine trade type from deal type
+                    entry_type = getattr(entry_deal, 'type', 0)
+                    # MT5 deal types: 0=BUY, 1=SELL, 2=BALANCE, 3=CREDIT, 4=CHARGE, 5=CORRECTION, 6=BONUS, 7=COMMISSION, 8=DIVIDEND, 9=DIVIDEND_FRANKED, 10=TAX
+                    if entry_type == 0:  # DEAL_TYPE_BUY
+                        trade_type = "BUY"
+                    elif entry_type == 1:  # DEAL_TYPE_SELL
+                        trade_type = "SELL"
+                    else:
+                        # For other deal types, try to determine from volume sign
+                        volume = float(getattr(entry_deal, 'volume', 0))
+                        trade_type = "BUY" if volume > 0 else "SELL"
+                    
+                    # Get trade details
+                    symbol = getattr(entry_deal, 'symbol', '')
+                    volume = float(getattr(entry_deal, 'volume', 0))
+                    entry_price = float(getattr(entry_deal, 'price', 0))
+                    exit_price = float(getattr(exit_deal, 'price', 0))
+                    
+                    # Calculate percentage change
+                    change_percent = 0.0
+                    if entry_price > 0 and exit_price > 0:
+                        if trade_type == "BUY":
+                            change_percent = ((exit_price - entry_price) / entry_price) * 100
+                        else:  # SELL
+                            change_percent = ((entry_price - exit_price) / entry_price) * 100
+                    
+                    # Create trade data
+                    trade_data = {
+                        "id": int(position_id),
+                        "ticket": int(position_id),
+                        "timestamp": datetime.fromtimestamp(getattr(entry_deal, 'time', 0)).isoformat(),
+                        "time": datetime.fromtimestamp(getattr(entry_deal, 'time', 0)).isoformat(),
+                        "close_time": datetime.fromtimestamp(getattr(exit_deal, 'time', 0)).isoformat(),
+                        "symbol": symbol,
+                        "type": trade_type,
+                        "volume": volume,
+                        "price": entry_price,
+                        "entry_price": entry_price,
+                        "exit_price": exit_price,
+                        "current_price": exit_price,
+                        "sl": 0.0,  # SL/TP not available in deals
+                        "tp": 0.0,
+                        "profit": total_profit + total_commission + total_swap,
+                        "raw_profit": total_profit,
+                        "commission": total_commission,
+                        "swap": total_swap,
+                        "change_percent": change_percent,
+                        "comment": getattr(entry_deal, 'comment', ''),
+                        "identifier": position_id,
+                        "reason": getattr(exit_deal, 'reason', None),
+                        "is_open": False
+                    }
+                    
+                    closed_trades.append(trade_data)
+                    log.info(f"Processed closed trade {position_id}: {trade_type} {volume} {symbol} "
+                            f"entry: {entry_price}, exit: {exit_price}, profit: {total_profit:.2f}")
+                    
+                except Exception as e:
+                    log.error(f"Error processing position {position_id}: {e}")
+                    continue
         
-        # Convert positions to trade format with proper profit calculation
-        trades = []
-        for position in all_positions:
+        # Convert current open positions to trade format
+        for position in current_positions:
             try:
                 # Convert position type to readable format
-                position_type = "BUY" if position.type == mt5.POSITION_TYPE_BUY else "SELL"
+                # Check if constants are available
+                if hasattr(mt5, 'POSITION_TYPE_BUY'):
+                    position_type = "BUY" if position.type == mt5.POSITION_TYPE_BUY else "SELL"
+                else:
+                    # Fallback for older MT5 versions or missing constants
+                    position_type = "BUY" if getattr(position, 'type', 0) == 0 else "SELL"
                 
                 # Get position timestamps
                 open_time = datetime.fromtimestamp(position.time) if hasattr(position, 'time') else datetime.now()
-                close_time = datetime.fromtimestamp(position.time_update) if hasattr(position, 'time_update') else None
                 
                 # Calculate real profit
                 real_profit = float(getattr(position, 'profit', 0))
@@ -1045,12 +1133,6 @@ def get_trade_history():
                 open_price = float(getattr(position, 'price_open', 0))
                 current_price = float(getattr(position, 'price_current', open_price))
                 
-                # For closed positions, use close price if available
-                close_price = 0.0
-                if hasattr(position, 'price_close') and position.price_close > 0:
-                    close_price = float(position.price_close)
-                    current_price = close_price
-                
                 # Calculate percentage change
                 change_percent = 0.0
                 if open_price > 0 and current_price > 0:
@@ -1059,21 +1141,18 @@ def get_trade_history():
                     else:  # SELL
                         change_percent = ((open_price - current_price) / open_price) * 100
                 
-                # Determine if position is still open (closed positions have a 'reason')
-                is_open = not hasattr(position, 'reason') or getattr(position, 'reason', None) is None
-                
                 trade_data = {
                     "id": int(getattr(position, 'ticket', 0)),
                     "ticket": int(getattr(position, 'ticket', 0)),
                     "timestamp": open_time.isoformat(),
                     "time": open_time.isoformat(),
-                    "close_time": close_time.isoformat() if close_time else None,
+                    "close_time": None,
                     "symbol": getattr(position, 'symbol', ''),
                     "type": position_type,
                     "volume": float(getattr(position, 'volume', 0)),
                     "price": open_price,
                     "entry_price": open_price,
-                    "exit_price": close_price if close_price > 0 else current_price,
+                    "exit_price": current_price,
                     "current_price": current_price,
                     "sl": sl,
                     "tp": tp,
@@ -1084,26 +1163,38 @@ def get_trade_history():
                     "change_percent": change_percent,
                     "comment": getattr(position, 'comment', ''),
                     "identifier": getattr(position, 'identifier', None),
-                    "reason": getattr(position, 'reason', None),
-                    "is_open": is_open
+                    "reason": None,
+                    "is_open": True
                 }
                 
-                trades.append(trade_data)
-                log.info(f"Position {trade_data['ticket']}: {position_type} {trade_data['volume']} {trade_data['symbol']} "
-                        f"at {open_price}, profit: {total_profit}, change: {change_percent:.2f}%, open: {is_open}")
+                open_trades.append(trade_data)
+                log.info(f"Open Position {trade_data['ticket']}: {position_type} {trade_data['volume']} {trade_data['symbol']} "
+                        f"at {open_price}, current: {current_price}, profit: {total_profit:.2f}, change: {change_percent:.2f}%")
                 
             except Exception as position_error:
-                log.error(f"Error processing position {getattr(position, 'ticket', 'unknown')}: {position_error}")
+                log.error(f"Error processing open position {getattr(position, 'ticket', 'unknown')}: {position_error}")
                 continue
         
+        # Combine all trades (closed + open)
+        all_trades = closed_trades + open_trades
+        
+        log.info(f"Trade processing summary: {len(closed_trades)} closed trades, {len(open_trades)} open positions")
+        
+        if len(all_trades) == 0:
+            log.info("No trades found in MT5 account - returning empty list")
+            return jsonify([])
+        
         # Sort trades by time (newest first)
-        trades.sort(key=lambda x: x['timestamp'], reverse=True)
+        try:
+            all_trades.sort(key=lambda x: x['timestamp'], reverse=True)
+        except Exception as sort_error:
+            log.error(f"Error sorting trades: {sort_error}")
+            # If sorting fails, return unsorted data
         
-        log.info(f"Successfully retrieved {len(trades)} trades from MT5 account")
-        log.info(f"Open positions: {len([t for t in trades if t['is_open']])}, "
-                f"Closed positions: {len([t for t in trades if not t['is_open']])}")
+        log.info(f"Successfully retrieved {len(all_trades)} total trades from MT5 account")
+        log.info(f"Final breakdown - Closed trades: {len(closed_trades)}, Open positions: {len(open_trades)}")
         
-        return jsonify(trades)
+        return jsonify(all_trades)
         
     except Exception as e:
         log.error(f"Error fetching trade history: {e}", exc_info=True)

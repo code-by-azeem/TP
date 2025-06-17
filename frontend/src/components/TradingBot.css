@@ -1,0 +1,380 @@
+.trading-bot-container {
+  background: #1a1a1a;
+  border-radius: 12px;
+  padding: 20px;
+  color: #e0e0e0;
+  margin-bottom: 20px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+}
+
+.bot-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 25px;
+  padding-bottom: 15px;
+  border-bottom: 1px solid #333;
+}
+
+.bot-header h2 {
+  margin: 0;
+  color: #00d4aa;
+  font-size: 1.5rem;
+}
+
+.bot-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  border-radius: 20px;
+  font-weight: 600;
+  font-size: 14px;
+  transition: all 0.3s ease;
+}
+
+.bot-status.running {
+  background: rgba(0, 212, 170, 0.2);
+  color: #00d4aa;
+  border: 1px solid #00d4aa;
+}
+
+.bot-status.stopped {
+  background: rgba(239, 68, 68, 0.2);
+  color: #ef4444;
+  border: 1px solid #ef4444;
+}
+
+.status-indicator {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  animation: pulse 2s infinite;
+}
+
+.bot-status.running .status-indicator {
+  background: #00d4aa;
+}
+
+.bot-status.stopped .status-indicator {
+  background: #ef4444;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+.bot-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+  align-items: end;
+  margin-bottom: 30px;
+  padding: 20px;
+  background: #262626;
+  border-radius: 8px;
+}
+
+.control-group {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 150px;
+}
+
+.control-group label {
+  font-weight: 600;
+  color: #b0b0b0;
+  font-size: 14px;
+}
+
+.control-group select {
+  padding: 10px;
+  border: 1px solid #444;
+  border-radius: 6px;
+  background: #1a1a1a;
+  color: #e0e0e0;
+  font-size: 14px;
+  transition: border-color 0.3s ease;
+}
+
+.control-group select:focus {
+  outline: none;
+  border-color: #00d4aa;
+}
+
+.control-group select:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.bot-buttons {
+  display: flex;
+  gap: 10px;
+}
+
+.bot-buttons button {
+  padding: 12px 24px;
+  border: none;
+  border-radius: 6px;
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  min-width: 100px;
+}
+
+.start-btn {
+  background: #00d4aa;
+  color: white;
+}
+
+.start-btn:hover:not(:disabled) {
+  background: #00b894;
+  transform: translateY(-1px);
+}
+
+.stop-btn {
+  background: #ef4444;
+  color: white;
+}
+
+.stop-btn:hover:not(:disabled) {
+  background: #dc2626;
+  transform: translateY(-1px);
+}
+
+.bot-buttons button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.bot-performance, .bot-config, .bot-updates {
+  margin-bottom: 25px;
+}
+
+.bot-performance h3, .bot-config h3, .bot-updates h3 {
+  margin: 0 0 15px 0;
+  color: #00d4aa;
+  font-size: 1.2rem;
+  font-weight: 600;
+}
+
+.performance-grid, .config-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 15px;
+}
+
+.performance-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  background: #262626;
+  border-radius: 6px;
+  border-left: 3px solid #00d4aa;
+}
+
+.performance-item span:first-child {
+  color: #b0b0b0;
+  font-weight: 500;
+}
+
+.performance-item span:last-child {
+  color: #e0e0e0;
+  font-weight: 600;
+}
+
+.performance-item .positive {
+  color: #00d4aa;
+}
+
+.performance-item .negative {
+  color: #ef4444;
+}
+
+.config-item {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.config-item label {
+  color: #b0b0b0;
+  font-weight: 500;
+  font-size: 14px;
+}
+
+.config-item input {
+  padding: 10px;
+  border: 1px solid #444;
+  border-radius: 6px;
+  background: #1a1a1a;
+  color: #e0e0e0;
+  font-size: 14px;
+  transition: border-color 0.3s ease;
+}
+
+.config-item input:focus {
+  outline: none;
+  border-color: #00d4aa;
+}
+
+.config-item input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  accent-color: #00d4aa;
+  cursor: pointer;
+}
+
+.update-config-btn {
+  margin-top: 15px;
+  padding: 12px 24px;
+  background: #6366f1;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.update-config-btn:hover {
+  background: #5856eb;
+  transform: translateY(-1px);
+}
+
+.updates-list {
+  max-height: 300px;
+  overflow-y: auto;
+  border: 1px solid #333;
+  border-radius: 6px;
+  background: #262626;
+}
+
+.no-updates {
+  padding: 20px;
+  text-align: center;
+  color: #666;
+  font-style: italic;
+}
+
+.update-item {
+  padding: 12px 16px;
+  border-bottom: 1px solid #333;
+  transition: background-color 0.2s ease;
+}
+
+.update-item:hover {
+  background: #2a2a2a;
+}
+
+.update-item:last-child {
+  border-bottom: none;
+}
+
+.update-time {
+  font-size: 12px;
+  color: #888;
+  margin-bottom: 4px;
+}
+
+.update-type {
+  font-weight: 600;
+  color: #00d4aa;
+  margin-bottom: 4px;
+  text-transform: uppercase;
+  font-size: 12px;
+}
+
+.update-content {
+  display: flex;
+  gap: 15px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.signal {
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-weight: 600;
+  font-size: 12px;
+}
+
+.signal.buy {
+  background: rgba(0, 212, 170, 0.2);
+  color: #00d4aa;
+  border: 1px solid #00d4aa;
+}
+
+.signal.sell {
+  background: rgba(239, 68, 68, 0.2);
+  color: #ef4444;
+  border: 1px solid #ef4444;
+}
+
+.status {
+  padding: 2px 6px;
+  border-radius: 3px;
+  background: #333;
+  color: #ccc;
+  font-size: 11px;
+  text-transform: uppercase;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .trading-bot-container {
+    padding: 15px;
+  }
+  
+  .bot-header {
+    flex-direction: column;
+    gap: 15px;
+    align-items: flex-start;
+  }
+  
+  .bot-controls {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  
+  .bot-buttons {
+    width: 100%;
+  }
+  
+  .bot-buttons button {
+    flex: 1;
+  }
+  
+  .performance-grid, .config-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .update-content {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+}
+
+/* Scrollbar Styling */
+.updates-list::-webkit-scrollbar {
+  width: 6px;
+}
+
+.updates-list::-webkit-scrollbar-track {
+  background: #1a1a1a;
+}
+
+.updates-list::-webkit-scrollbar-thumb {
+  background: #444;
+  border-radius: 3px;
+}
+
+.updates-list::-webkit-scrollbar-thumb:hover {
+  background: #555;
+} 

@@ -21,6 +21,9 @@ from dotenv import load_dotenv
 import random
 from collections import Counter # Added for logging client counts by timeframe
 
+# Import trading bot
+from trading_bot.bot_manager import bot_manager
+
 # --- Configuration ---
 load_dotenv()
 SYMBOL = os.getenv("MT5_SYMBOL", "ETHUSD")
@@ -1436,6 +1439,198 @@ def is_mt5_connected():
     except Exception as e:
         log.error(f"Error checking MT5 connection: {e}")
         return False
+
+# --- Trading Bot Integration ---
+
+def bot_update_callback(data):
+    """Callback function to handle bot updates and send to frontend"""
+    try:
+        # Send bot updates to all connected clients
+        socketio.emit('bot_update', data)
+        log.info(f"Sent bot update: {data.get('type', 'unknown')}")
+    except Exception as e:
+        log.error(f"Error sending bot update: {e}")
+
+# Register bot update callback
+bot_manager.register_update_callback(bot_update_callback)
+
+# Trading Bot API Routes
+@app.route('/bot/status', methods=['GET'])
+def get_bot_status():
+    """Get current bot status"""
+    try:
+        status = bot_manager.get_bot_status()
+        return jsonify({
+            'success': True,
+            'data': status
+        })
+    except Exception as e:
+        log.error(f"Error getting bot status: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+@app.route('/bot/start', methods=['POST'])
+def start_bot():
+    """Start the trading bot"""
+    try:
+        data = request.get_json() or {}
+        strategy = data.get('strategy', 'default')
+        
+        success = bot_manager.start_bot(strategy)
+        
+        if success:
+            return jsonify({
+                'success': True,
+                'message': f'Bot started with strategy: {strategy}'
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'error': 'Failed to start bot'
+            }), 400
+            
+    except Exception as e:
+        log.error(f"Error starting bot: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+@app.route('/bot/stop', methods=['POST'])
+def stop_bot():
+    """Stop the trading bot"""
+    try:
+        success = bot_manager.stop_bot()
+        
+        if success:
+            return jsonify({
+                'success': True,
+                'message': 'Bot stopped successfully'
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'error': 'Bot was not running'
+            }), 400
+            
+    except Exception as e:
+        log.error(f"Error stopping bot: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+@app.route('/bot/config', methods=['GET', 'POST'])
+def bot_config():
+    """Get or update bot configuration"""
+    if request.method == 'GET':
+        try:
+            config = bot_manager.config
+            return jsonify({
+                'success': True,
+                'data': config
+            })
+        except Exception as e:
+            log.error(f"Error getting bot config: {e}")
+            return jsonify({
+                'success': False,
+                'error': str(e)
+            }), 500
+    
+    elif request.method == 'POST':
+        try:
+            new_config = request.get_json() or {}
+            bot_manager.update_config(new_config)
+            
+            return jsonify({
+                'success': True,
+                'message': 'Configuration updated',
+                'data': bot_manager.config
+            })
+            
+        except Exception as e:
+            log.error(f"Error updating bot config: {e}")
+            return jsonify({
+                'success': False,
+                'error': str(e)
+            }), 500
+
+@app.route('/bot/strategies', methods=['GET'])
+def get_strategies():
+    """Get available trading strategies"""
+    try:
+        strategies = bot_manager.get_available_strategies()
+        return jsonify({
+            'success': True,
+            'data': strategies
+        })
+    except Exception as e:
+        log.error(f"Error getting strategies: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+# Trading Bot WebSocket Events
+@socketio.on('bot_start')
+def handle_bot_start(data):
+    """Handle bot start request via WebSocket"""
+    try:
+        strategy = data.get('strategy', 'default') if data else 'default'
+        success = bot_manager.start_bot(strategy)
+        
+        socketio.emit('bot_start_response', {
+            'success': success,
+            'strategy': strategy,
+            'timestamp': datetime.now().isoformat()
+        }, room=request.sid)
+        
+    except Exception as e:
+        log.error(f"Error in bot_start handler: {e}")
+        socketio.emit('bot_error', {
+            'error': str(e),
+            'timestamp': datetime.now().isoformat()
+        }, room=request.sid)
+
+@socketio.on('bot_stop')
+def handle_bot_stop(data):
+    """Handle bot stop request via WebSocket"""
+    try:
+        success = bot_manager.stop_bot()
+        
+        socketio.emit('bot_stop_response', {
+            'success': success,
+            'timestamp': datetime.now().isoformat()
+        }, room=request.sid)
+        
+    except Exception as e:
+        log.error(f"Error in bot_stop handler: {e}")
+        socketio.emit('bot_error', {
+            'error': str(e),
+            'timestamp': datetime.now().isoformat()
+        }, room=request.sid)
+
+@socketio.on('bot_config_update')
+def handle_bot_config_update(data):
+    """Handle bot configuration update via WebSocket"""
+    try:
+        if data:
+            bot_manager.update_config(data)
+            
+        socketio.emit('bot_config_response', {
+            'success': True,
+            'config': bot_manager.config,
+            'timestamp': datetime.now().isoformat()
+        }, room=request.sid)
+        
+    except Exception as e:
+        log.error(f"Error in bot_config_update handler: {e}")
+        socketio.emit('bot_error', {
+            'error': str(e),
+            'timestamp': datetime.now().isoformat()
+        }, room=request.sid)
 
 # --- Main Execution Block ---
 if __name__ == "__main__":

@@ -1,8 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import TradeHistory from './TradeHistory';
 import AccountInfo from './AccountInfo';
 import CandlestickChart from './CandlestickChart';
+import TradingBot from './TradingBot';
+import io from 'socket.io-client';
 import './Dashboard.css';
 
 const Dashboard = () => {
@@ -17,36 +19,10 @@ const Dashboard = () => {
   });
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('chart'); // Default to chart view
+  const [socket, setSocket] = useState(null);
   
-  // Check if user is authenticated on component mount
-  useEffect(() => {
-    const checkAuth = async () => {
-      try {
-        const response = await fetch('http://localhost:5000/auth-check', {
-          credentials: 'include',
-        });
-        
-        const data = await response.json();
-        
-        if (!data.authenticated) {
-          // Redirect to login page if not authenticated
-          navigate('/');
-        } else if (data.username) {
-          setUsername(data.username);
-          
-          // Fetch account data
-          fetchAccountData();
-        }
-      } catch (error) {
-        console.error('Auth check error:', error);
-      }
-    };
-    
-    checkAuth();
-  }, [navigate]);
-  
-  // Fetch account data
-  const fetchAccountData = async () => {
+  // Fetch account data - wrapped in useCallback to prevent recreation on each render
+  const fetchAccountData = useCallback(async () => {
     setIsLoading(true);
     try {
       const response = await fetch('http://localhost:5000/account', {
@@ -74,7 +50,51 @@ const Dashboard = () => {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
+  
+  // Check if user is authenticated on component mount
+  useEffect(() => {
+    let newSocket = null;
+    
+    const checkAuth = async () => {
+      try {
+        const response = await fetch('http://localhost:5000/auth-check', {
+          credentials: 'include',
+        });
+        
+        const data = await response.json();
+        
+        if (!data.authenticated) {
+          // Redirect to login page if not authenticated
+          navigate('/');
+        } else if (data.username) {
+          setUsername(data.username);
+          
+          // Fetch account data
+          fetchAccountData();
+          
+          // Initialize socket connection
+          newSocket = io('http://localhost:5000', {
+            transports: ['websocket', 'polling'],
+            autoConnect: true,
+          });
+          
+          setSocket(newSocket);
+        }
+      } catch (error) {
+        console.error('Auth check error:', error);
+      }
+    };
+    
+    checkAuth();
+    
+    // Cleanup function
+    return () => {
+      if (newSocket) {
+        newSocket.disconnect();
+      }
+    };
+  }, [navigate, fetchAccountData]);
   
   const handleLogout = async () => {
     try {
@@ -118,6 +138,8 @@ const Dashboard = () => {
         return renderAccountDetails();
       case 'history':
         return <TradeHistory />;
+      case 'bot':
+        return <TradingBot socket={socket} />;
       case 'chart':
       default:
         return (
@@ -173,6 +195,16 @@ const Dashboard = () => {
               <polyline points="12 6 12 12 16 14"></polyline>
             </svg>
             <span>Trade History</span>
+          </button>
+          <button 
+            className={`tab-button ${activeTab === 'bot' ? 'active' : ''}`} 
+            onClick={() => switchTab('bot')}
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 3a6 6 0 0 0-6 6v1a1 1 0 0 0 1 1h2a1 1 0 0 0 1-1V9a2 2 0 1 1 4 0v1a1 1 0 0 0 1 1h2a1 1 0 0 0 1-1V9a6 6 0 0 0-6-6z"></path>
+              <path d="M9 12v6a3 3 0 0 0 6 0v-6"></path>
+            </svg>
+            <span>Trading Bot</span>
           </button>
         </div>
         

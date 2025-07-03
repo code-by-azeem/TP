@@ -72,19 +72,6 @@ function CandlestickChart() {
     const [error, setError] = useState(null);
     const [isConnected, setIsConnected] = useState(false);
     const [lastUpdateTime, setLastUpdateTime] = useState(null);
-    const [showDiagnostics, setShowDiagnostics] = useState(false);
-    const [socketInfo, setSocketInfo] = useState({
-        id: null,
-        transport: null,
-        lastPing: null,
-        lastPong: null,
-        errors: []
-    });
-    const [debugInfo, setDebugInfo] = useState({
-        dataLoaded: false,
-        fetchCount: 0,
-        lastFetch: null
-    });
     const [isFullscreen, setIsFullscreen] = useState(false);
 
     // Helper function to ensure timestamp is in seconds (not milliseconds)
@@ -219,12 +206,8 @@ function CandlestickChart() {
         isFetchingData = true;
         setError(null);
         
-        // Update debug info
-        setDebugInfo(prev => ({
-            ...prev,
-            fetchCount: prev.fetchCount + 1,
-            lastFetch: new Date().toLocaleTimeString()
-        }));
+        // Fetch count tracking for logging
+        console.log(`Fetching data for timeframe: ${selectedTimeframe}`);
         
         try {
             const apiUrl = `${FLASK_SERVER_URL}/data?timeframe=${selectedTimeframe}`;
@@ -246,7 +229,6 @@ function CandlestickChart() {
                 candlestickSeriesRef.current.setData(dummyData);
                 chartRef.current.timeScale().fitContent();
                 dataLoadedRef.current = true;
-                setDebugInfo(prev => ({ ...prev, dataLoaded: true }));
                 return;
             }
             
@@ -415,10 +397,6 @@ function CandlestickChart() {
             
             // Mark data as loaded
             dataLoadedRef.current = true;
-            setDebugInfo(prev => ({
-                ...prev,
-                dataLoaded: true
-            }));
             
         } catch (err) { 
             console.error(`Historical data fetch error for ${selectedTimeframe}:`, err);
@@ -580,13 +558,7 @@ function CandlestickChart() {
                 setError(null);
                 reconnectCountRef.current = 0; // Reset reconnection attempts
                 
-                // Update socket information
-                setSocketInfo(prev => ({
-                    ...prev,
-                    id: socketRef.current.id,
-                    transport: socketRef.current.io.engine.transport.name,
-                    errors: []
-                }));
+                // Socket connected successfully
                 
                 // Request initial data with the current timeframe
                 socketRef.current.emit('set_timeframe', { 
@@ -621,10 +593,6 @@ function CandlestickChart() {
             // Track transport changes
             socketRef.current.io.engine.on('transportChange', (transport) => {
                 logWebSocketDebug(`Transport changed to: ${transport.name}`);
-                setSocketInfo(prev => ({
-                    ...prev,
-                    transport: transport.name
-                }));
             });
             
             // Log upgraded connections
@@ -726,12 +694,9 @@ function CandlestickChart() {
                     logWebSocketDebug(`Using built-in reconnection for reason: ${reason}`);
                 }
                 
-                // Log error but don't show to user for normal disconnects like 'io client disconnect'
+                // Log disconnect reason
                 if (reason !== 'io client disconnect') {
-                    setSocketInfo(prev => ({
-                        ...prev,
-                        errors: [...prev.errors, `Disconnect: ${reason} at ${new Date().toLocaleTimeString()}`]
-                    }));
+                    console.log(`Disconnect logged: ${reason} at ${new Date().toLocaleTimeString()}`);
                 }
             });
 
@@ -741,10 +706,7 @@ function CandlestickChart() {
                 setIsConnected(false);
                 setError(`Connection error: ${err.message}`);
                 
-                setSocketInfo(prev => ({
-                    ...prev,
-                    errors: [...prev.errors, `Connect Error: ${err.message} at ${new Date().toLocaleTimeString()}`]
-                }));
+                console.log(`Connect Error logged: ${err.message} at ${new Date().toLocaleTimeString()}`);
                 
                 // Let the socket's built-in reconnection handle this
             });
@@ -777,19 +739,12 @@ function CandlestickChart() {
             // Socket error event
             socketRef.current.on('error', (err) => {
                 logWebSocketDebug(`Socket error: ${err.message}`);
-                setSocketInfo(prev => ({
-                    ...prev,
-                    errors: [...prev.errors, `Error: ${err.message} at ${new Date().toLocaleTimeString()}`]
-                }));
+                console.log(`Socket Error logged: ${err.message} at ${new Date().toLocaleTimeString()}`);
             });
 
             // Pong responses (for tracking latency)
             socketRef.current.on('pong', (latency) => {
-                setSocketInfo(prev => ({
-                    ...prev,
-                    lastPong: new Date().toLocaleTimeString(),
-                    latency: latency
-                }));
+                logWebSocketDebug(`Pong received with latency: ${latency}ms`);
             });
             
             // Set up activity pings to keep connection alive and detect silent failures
@@ -798,11 +753,7 @@ function CandlestickChart() {
                     const pingStart = new Date();
                     socketRef.current.emit('ping_server', { timestamp: pingStart.getTime() }, (response) => {
                         const latency = new Date() - pingStart;
-                        setSocketInfo(prev => ({
-                            ...prev,
-                            lastPing: pingStart.toLocaleTimeString(),
-                            latency: latency
-                        }));
+                        logWebSocketDebug(`Ping response received with latency: ${latency}ms`);
                         
                         // Update the last update reference to show activity
                         lastUpdateRef.current = new Date();
@@ -1265,12 +1216,13 @@ function CandlestickChart() {
         };
     }, [isConnected]);
 
-    // Handle fullscreen toggle
+    // Handle fullscreen toggle with proper event handling
     const toggleFullscreen = () => {
         const chartContainer = chartContainerRef.current;
         if (!chartContainer) return;
 
-        if (!isFullscreen) {
+        if (!document.fullscreenElement) {
+            // Enter fullscreen
             if (chartContainer.requestFullscreen) {
                 chartContainer.requestFullscreen();
             } else if (chartContainer.mozRequestFullScreen) {
@@ -1281,6 +1233,7 @@ function CandlestickChart() {
                 chartContainer.msRequestFullscreen();
             }
         } else {
+            // Exit fullscreen
             if (document.exitFullscreen) {
                 document.exitFullscreen();
             } else if (document.mozCancelFullScreen) {
@@ -1291,8 +1244,98 @@ function CandlestickChart() {
                 document.msExitFullscreen();
             }
         }
-        setIsFullscreen(!isFullscreen);
     };
+
+    // Listen for fullscreen changes to update state and resize chart
+    useEffect(() => {
+        const handleFullscreenChange = () => {
+            const isCurrentlyFullscreen = !!(
+                document.fullscreenElement ||
+                document.mozFullScreenElement ||
+                document.webkitFullscreenElement ||
+                document.msFullscreenElement
+            );
+            
+            setIsFullscreen(isCurrentlyFullscreen);
+            
+            // Resize chart after fullscreen state change
+            setTimeout(() => {
+                if (chartRef.current) {
+                    const container = chartContainerRef.current;
+                    if (container) {
+                        const rect = container.getBoundingClientRect();
+                        chartRef.current.applyOptions({
+                            width: rect.width,
+                            height: rect.height,
+                        });
+                        chartRef.current.timeScale().fitContent();
+                    }
+                }
+            }, 100);
+        };
+
+        // Add fullscreen event listeners
+        document.addEventListener('fullscreenchange', handleFullscreenChange);
+        document.addEventListener('mozfullscreenchange', handleFullscreenChange);
+        document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
+        document.addEventListener('msfullscreenchange', handleFullscreenChange);
+
+        return () => {
+            document.removeEventListener('fullscreenchange', handleFullscreenChange);
+            document.removeEventListener('mozfullscreenchange', handleFullscreenChange);
+            document.removeEventListener('webkitfullscreenchange', handleFullscreenChange);
+            document.removeEventListener('msfullscreenchange', handleFullscreenChange);
+        };
+    }, []);
+
+    // Enhanced resize handling for better responsiveness
+    useEffect(() => {
+        const handleResize = () => {
+            const container = chartContainerRef.current;
+            if (container && chartRef.current) {
+                // Get container dimensions
+                const rect = container.getBoundingClientRect();
+                
+                // Ensure minimum dimensions
+                const width = Math.max(rect.width, 300);
+                const height = Math.max(rect.height, 200);
+                
+                chartRef.current.applyOptions({
+                    width: width,
+                    height: height,
+                });
+                
+                // Fit content after resize
+                setTimeout(() => {
+                    if (chartRef.current) {
+                        chartRef.current.timeScale().fitContent();
+                    }
+                }, 50);
+            }
+        };
+
+        // Create ResizeObserver for better responsiveness
+        let resizeObserver;
+        if (window.ResizeObserver && chartContainerRef.current) {
+            resizeObserver = new ResizeObserver(() => {
+                handleResize();
+            });
+            resizeObserver.observe(chartContainerRef.current);
+        }
+
+        // Fallback window resize listener
+        window.addEventListener('resize', handleResize);
+        
+        // Initial resize
+        handleResize();
+
+        return () => {
+            window.removeEventListener('resize', handleResize);
+            if (resizeObserver) {
+                resizeObserver.disconnect();
+            }
+        };
+    }, []); // Empty dependency array since this should only run once on mount
 
     // Handler for timeframe dropdown change
     const handleTimeframeChange = (event) => { 
@@ -1304,59 +1347,6 @@ function CandlestickChart() {
         
         // Log user-initiated timeframe change
         logWebSocketDebug(`User changed timeframe from ${timeframe} to ${newTimeframe}`);
-    };
-
-    // Add this function to show diagnostic info about updates
-    const showDiagnosticUpdate = () => {
-        if (window.showDiagnosticWindow === undefined) {
-            window.showDiagnosticWindow = true;
-            
-            // Create a small floating window with real-time update info
-            const div = document.createElement('div');
-            div.className = 'diagnostic-float';
-            div.style.position = 'fixed';
-            div.style.bottom = '10px';
-            div.style.left = '10px';
-            div.style.background = 'rgba(0,0,0,0.7)';
-            div.style.color = 'white';
-            div.style.padding = '5px 10px';
-            div.style.borderRadius = '4px';
-            div.style.fontSize = '12px';
-            div.style.zIndex = '9999';
-            div.style.fontFamily = 'monospace';
-            
-            // Update the diagnostic info every 500ms
-            const updateInterval = setInterval(() => {
-                if (!document.body.contains(div)) {
-                    document.body.appendChild(div);
-                }
-                
-                div.innerHTML = `
-                    <div>Updates: ${updateStats.updates}/s (Max: ${updateStats.maxPerSecond})</div>
-                    <div>Total: ${updateStats.total}</div>
-                    <div>Last: ${lastUpdateRef.current ? new Date(lastUpdateRef.current).toLocaleTimeString() : 'None'}</div>
-                `;
-            }, 500);
-            
-            // Add close button
-            const closeBtn = document.createElement('button');
-            closeBtn.innerText = 'X';
-            closeBtn.style.position = 'absolute';
-            closeBtn.style.top = '0';
-            closeBtn.style.right = '0';
-            closeBtn.style.background = 'none';
-            closeBtn.style.border = 'none';
-            closeBtn.style.color = 'white';
-            closeBtn.style.cursor = 'pointer';
-            closeBtn.onclick = () => {
-                clearInterval(updateInterval);
-                div.remove();
-                window.showDiagnosticWindow = undefined;
-            };
-            
-            div.appendChild(closeBtn);
-            document.body.appendChild(div);
-        }
     };
 
     // UI rendering
@@ -1382,162 +1372,14 @@ function CandlestickChart() {
                 <div className={`connection-status ${isConnected ? 'connected' : 'disconnected'}`}>
                     <div className="status-icon"></div>
                     {isConnected ? (
-                        <span>
-                            Real-time Connected 
-                            {lastUpdateTime && ` (Last: ${lastUpdateTime})`}
-                </span>
+                        <span>Real-time Connected {lastUpdateTime && `(Last: ${lastUpdateTime.split(':')[0]}:${lastUpdateTime.split(':')[1]})`}</span>
                     ) : (
-                        <span>
-                            {error || "Connecting..."}
-                        </span>
+                        <span>{isLoading ? "Connecting..." : "Disconnected"}</span>
                     )}
                 </div>
-                
-                {/* Add a more detailed status bar */}
-                <div className="chart-status-bar">
-                    <div className="chart-status-item">
-                        <span className="status-label">Timeframe:</span>
-                        <span className="status-value">{timeframe}</span>
-                    </div>
-                    <div className="chart-status-item">
-                        <span className="status-label">Connection:</span>
-                        <span className={`status-value ${isConnected ? 'status-ok' : 'status-error'}`}>
-                            {isConnected ? 'Connected' : 'Disconnected'}
-                        </span>
-                    </div>
-                    <div className="chart-status-item">
-                        <span className="status-label">Transport:</span>
-                        <span className="status-value">{socketInfo.transport || 'Unknown'}</span>
-                    </div>
-                    <div className="chart-status-item">
-                        <span className="status-label">Last Update:</span>
-                        <span className="status-value">{lastUpdateTime || 'Never'}</span>
-                    </div>
-                    {socketInfo.latency && (
-                        <div className="chart-status-item">
-                            <span className="status-label">Latency:</span>
-                            <span className="status-value">{socketInfo.latency}ms</span>
-                        </div>
-                    )}
-                    <div className="chart-status-item">
-                        <span className="status-label">Updates:</span>
-                        <span className="status-value">{updateStats.total > 0 ? 
-                            `${updateStats.maxPerSecond}/sec` : 
-                            'Waiting...'}</span>
-                    </div>
-                    <div className="live-indicator" title="Blinking when receiving updates">
-                        <div className={`pulse ${updateStats.updates > 0 ? 'active' : ''}`}></div>
-                    </div>
-                </div>
-                
-                {isLoading && <span className="status-loading">Loading...</span>}
-                {error && <span className="status-error" title={error}>Error!</span>}
             </div>
             
             <div ref={chartContainerRef} className="chart-container">
-                {/* Diagnostic panel */}
-                {showDiagnostics && (
-                    <div className="diagnostic-panel">
-                        <h3>
-                            WebSocket Diagnostics
-                            <button 
-                                className="close-button" 
-                                onClick={() => setShowDiagnostics(false)}
-                            >×</button>
-                        </h3>
-                        <ul>
-                            <li>
-                                Socket ID: {socketInfo.id || 'Not connected'}
-                            </li>
-                            <li>
-                                Transport: {socketInfo.transport || 'Unknown'}
-                            </li>
-                            <li>
-                                Connection Status: 
-                                <span className={isConnected ? 'status-good' : 'status-error'}>
-                                    {isConnected ? ' Connected' : ' Disconnected'}
-                                </span>
-                            </li>
-                            <li>
-                                Last Update: {lastUpdateTime || 'Never'}
-                            </li>
-                            <li>
-                                Last Ping: {socketInfo.lastPing || 'Never'}
-                            </li>
-                            <li>
-                                Last Pong: {socketInfo.lastPong || 'Never'}
-                            </li>
-                            <li>
-                                Current Timeframe: {timeframeRef.current}
-                            </li>
-                            <li>
-                                Data Loaded: <span className={debugInfo.dataLoaded ? 'status-good' : 'status-warn'}>
-                                    {debugInfo.dataLoaded ? 'Yes' : 'No'}
-                                </span>
-                            </li>
-                            <li>
-                                Fetch Count: {debugInfo.fetchCount}
-                            </li>
-                            <li>
-                                Last Fetch: {debugInfo.lastFetch || 'Never'}
-                            </li>
-                            {socketInfo.errors.length > 0 && (
-                                <li className="status-error">
-                                    Errors: {socketInfo.errors.slice(-3).join(', ')}
-                                </li>
-                            )}
-                            <li>
-                                Updates Statistics:
-                                <ul>
-                                    <li>Current Rate: {updateStats.updates}/sec</li>
-                                    <li>Peak Rate: {updateStats.maxPerSecond}/sec</li>
-                                    <li>Total Updates: {updateStats.total}</li>
-                                </ul>
-                            </li>
-                        </ul>
-                        <div className="button-group">
-                            <button 
-                                onClick={() => {
-                                    if (socketRef.current) {
-                                        socketRef.current.disconnect();
-                                    }
-                                    socketRef.current = initializeSocket();
-                                }}
-                            >
-                                Force Reconnect
-                            </button>
-                            <button 
-                                onClick={() => {
-                                    dataLoadedRef.current = false;
-                                    isFetchingData = false;
-                                    fetchHistoricalData(timeframeRef.current);
-                                }}
-                                style={{marginLeft: '8px'}}
-                            >
-                                Force Refresh Data
-                            </button>
-                            <button 
-                                onClick={showDiagnosticUpdate}
-                                style={{marginLeft: '8px'}}
-                            >
-                                Show Updates Monitor
-                            </button>
-                        </div>
-                    </div>
-                )}
-                <button 
-                    className="diagnostic-toggle" 
-                    onClick={() => {
-                        setShowDiagnostics(!showDiagnostics);
-                        // Show update diagnostics when toggling main diagnostics
-                        if (!showDiagnostics) {
-                            showDiagnosticUpdate();
-                        }
-                    }}
-                >
-                    {showDiagnostics ? 'Hide Diagnostics' : 'Show Diagnostics'}
-                </button>
-                
                 <button 
                     className="fullscreen-toggle" 
                     onClick={toggleFullscreen}

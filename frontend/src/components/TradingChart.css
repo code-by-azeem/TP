@@ -1,8 +1,9 @@
 .trading-chart-container {
-    background-color: #1e222d;
+    background-color: #1f2937; /* Dark navy */
     border-radius: 8px;
     padding: 20px;
     margin: 20px;
+    border: 1px solid rgba(82, 196, 26, 0.2); /* Green border */
 }
 
 .chart-header {
@@ -13,7 +14,7 @@
 }
 
 .chart-header h2 {
-    color: #d1d4dc;
+    color: #52c41a; /* Green */
     margin: 0;
 }
 
@@ -23,9 +24,9 @@
 }
 
 .timeframe-selector button {
-    background-color: #2a2e39;
-    border: none;
-    color: #787b86;
+    background-color: #374151; /* Dark navy */
+    border: 1px solid rgba(82, 196, 26, 0.2); /* Green border */
+    color: #d1d5db;
     padding: 6px 12px;
     border-radius: 4px;
     cursor: pointer;
@@ -33,13 +34,15 @@
 }
 
 .timeframe-selector button:hover {
-    background-color: #363a45;
-    color: #d1d4dc;
+    background-color: rgba(82, 196, 26, 0.1); /* Green hover */
+    color: #52c41a;
+    border-color: rgba(82, 196, 26, 0.4);
 }
 
 .timeframe-selector button.active {
-    background-color: #2962ff;
+    background-color: #52c41a; /* Green active */
     color: white;
+    border-color: #52c41a;
 }
 
 .chart-container {

@@ -1,155 +1,467 @@
+/* AccountInfo.css - Full Viewport Professional Layout */
+
+/* Main container - Full viewport usage */
 .account-info-container {
-    background-color: #1e222d;
-    border-radius: 8px;
-    padding: 20px;
-    margin: 20px;
-    color: #d1d4dc;
-    max-width: 100%;
-    overflow-x: auto;
+    width: 100vw;
+    height: 100%;
+    margin: 0;
+    padding: 30px 40px;
+    color: white;
+    overflow-y: auto;
+    box-sizing: border-box;
 }
 
 .account-info-container h2 {
-    color: #4fc3f7;
-    margin-bottom: 20px;
-    font-size: 1.4rem;
+    color: #52c41a;
+    margin-bottom: 30px;
+    font-size: 2.2rem; /* Increased size */
     text-align: center;
-    border-bottom: 2px solid #2a2e39;
-    padding-bottom: 10px;
+    font-weight: 700; /* Bolder */
+    text-shadow: 0 0 15px rgba(82, 196, 26, 0.4);
+    border-bottom: 2px solid rgba(82, 196, 26, 0.3);
+    padding-bottom: 15px;
 }
 
+/* Account sections container */
 .account-sections {
     display: flex;
     flex-direction: column;
-    gap: 25px;
+    gap: 30px;
+    max-width: none; /* Remove width constraints */
 }
 
+/* Field groups */
 .field-group {
-    background-color: rgba(42, 46, 57, 0.5);
-    border-radius: 8px;
-    padding: 20px;
-    border: 1px solid #3a3f4b;
+    background: linear-gradient(145deg, rgba(55, 65, 81, 0.8), rgba(31, 41, 55, 0.8));
+    border-radius: 12px;
+    padding: 30px; /* Increased padding */
+    border: 1px solid rgba(82, 196, 26, 0.2);
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.25); /* Enhanced shadow */
+    transition: all 0.3s ease;
+}
+
+.field-group:hover {
+    transform: translateY(-4px); /* More pronounced hover */
+    box-shadow: 0 12px 30px rgba(82, 196, 26, 0.18);
+    border-color: rgba(82, 196, 26, 0.4);
 }
 
 .group-title {
-    color: #4fc3f7;
-    margin: 0 0 15px 0;
-    font-size: 1.1rem;
-    font-weight: 600;
+    color: #52c41a;
+    font-size: 1.3rem; /* Increased size */
+    font-weight: 700; /* Bolder */
+    margin-bottom: 25px; /* Increased margin */
+    padding-bottom: 12px;
+    border-bottom: 1px solid rgba(82, 196, 26, 0.3);
     text-transform: uppercase;
-    letter-spacing: 1px;
-    border-bottom: 1px solid #4fc3f7;
-    padding-bottom: 8px;
+    letter-spacing: 1.2px;
 }
 
+/* Grid layout for info items */
 .group-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-    gap: 12px;
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); /* Increased minimum width */
+    gap: 18px; /* Increased gap */
 }
 
+/* Individual info items */
 .info-item {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 12px 15px;
-    background-color: #2a2e39;
-    border-radius: 6px;
-    border-left: 3px solid #4fc3f7;
+    padding: 18px 24px; /* Increased padding */
+    background: rgba(31, 41, 55, 0.6);
+    border-radius: 10px; /* Slightly larger radius */
+    border: 1px solid rgba(82, 196, 26, 0.1);
     transition: all 0.3s ease;
 }
 
 .info-item:hover {
-    background-color: #34394a;
+    background: rgba(55, 65, 81, 0.8);
+    border-color: rgba(82, 196, 26, 0.3);
     transform: translateY(-2px);
-    box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+    box-shadow: 0 6px 18px rgba(82, 196, 26, 0.12);
 }
 
-.label {
-    color: #787b86;
-    font-size: 0.85rem;
-    font-weight: 500;
+.info-item .label {
+    font-size: 0.95rem; /* Slightly larger */
+    font-weight: 600; /* Bolder */
+    color: #9ca3af;
     text-transform: uppercase;
-    letter-spacing: 0.5px;
-    flex: 1;
+    letter-spacing: 0.6px;
+    flex-shrink: 0;
+    margin-right: 15px;
 }
 
-.value {
-    font-weight: 600;
-    font-size: 1rem;
+.info-item .value {
+    font-size: 1.1rem; /* Larger */
+    font-weight: 700; /* Bolder */
+    color: #52c41a;
     text-align: right;
-    flex: 1;
+    flex-shrink: 0;
 }
 
-.value.profit {
-    color: #26a69a;
+/* Special value colors */
+.info-item .value.profit {
+    color: #52c41a;
 }
 
-.value.loss {
-    color: #ef5350;
+.info-item .value.loss {
+    color: #ef4444;
 }
 
-/* Responsive design */
+/* Responsive design with improved mobile handling */
 @media (max-width: 1200px) {
+    .account-info-container {
+        padding: 25px 30px;
+    }
+    
     .group-grid {
-        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+        gap: 12px;
     }
 }
 
 @media (max-width: 768px) {
-    .group-grid {
-        grid-template-columns: 1fr;
+    .account-info-container {
+        padding: 20px 15px;
     }
     
+    .account-info-container h2 {
+        font-size: 1.6rem;
+        margin-bottom: 25px;
+    }
+    
+    .account-sections {
+        gap: 25px;
+    }
+    
+    .field-group {
+        padding: 20px;
+    }
+    
+    .group-grid {
+        grid-template-columns: 1fr;
+        gap: 10px;
+    }
+    
+    .info-item {
+        padding: 12px 15px;
+        flex-wrap: wrap;
+    }
+    
+    .info-item .label {
+        font-size: 0.85rem;
+        flex-basis: 100%;
+        margin-bottom: 5px;
+    }
+    
+    .info-item .value {
+        font-size: 0.9rem;
+        flex-basis: 100%;
+        text-align: left;
+    }
+    
+    .group-title {
+        font-size: 1.1rem;
+    }
+}
+
+@media (max-width: 640px) {
     .account-info-container {
-        margin: 10px;
-        padding: 15px;
+        padding: 15px 10px;
+    }
+    
+    .account-info-container h2 {
+        font-size: 1.4rem;
     }
     
     .field-group {
         padding: 15px;
+        margin: 0 -5px; /* Extend to edges on very small screens */
     }
     
     .group-title {
         font-size: 1rem;
+        margin-bottom: 15px;
+    }
+    
+    .info-item {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+        padding: 12px 15px;
+    }
+    
+    .info-item .label {
+        margin-right: 0;
+        font-size: 0.8rem;
+    }
+    
+    .info-item .value {
+        text-align: left;
+        font-size: 0.85rem;
+        font-weight: 700; /* Emphasize values on small screens */
+    }
+}
+
+@media (max-width: 480px) {
+    .account-info-container {
+        padding: 10px 5px;
+    }
+    
+    .field-group {
+        padding: 12px;
+        margin: 0 -3px;
+        border-radius: 8px;
     }
     
     .info-item {
         padding: 10px 12px;
     }
     
-    .label, .value {
-        font-size: 0.9rem;
+    .info-item .label {
+        font-size: 0.75rem;
+        text-transform: none; /* Less uppercase on very small screens */
+    }
+    
+    .info-item .value {
+        font-size: 0.8rem;
     }
 }
 
-@media (max-width: 480px) {
+/* Comprehensive Responsive Design for All Screen Sizes */
+
+/* Large Desktop (1400px+) */
+@media (min-width: 1400px) {
     .account-info-container {
-        margin: 5px;
-        padding: 10px;
+        padding: 40px 50px;
+    }
+    
+    .account-info-container h2 {
+        font-size: 2.4rem;
+        margin-bottom: 35px;
+    }
+    
+    .account-sections {
+        gap: 35px;
     }
     
     .field-group {
-        padding: 10px;
+        padding: 35px;
+    }
+    
+    .group-grid {
+        grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+        gap: 20px;
+    }
+    
+    .info-item {
+        padding: 20px 28px;
+    }
+    
+    .info-item .label {
+        font-size: 1rem;
+    }
+    
+    .info-item .value {
+        font-size: 1.2rem;
+    }
+}
+
+/* Standard Desktop (1200px-1399px) */
+@media (max-width: 1399px) and (min-width: 1200px) {
+    .account-info-container {
+        padding: 35px 45px;
+    }
+    
+    .group-grid {
+        grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+        gap: 18px;
+    }
+}
+
+/* Small Desktop/Large Tablet (1024px-1199px) */
+@media (max-width: 1199px) and (min-width: 1024px) {
+    .account-info-container {
+        padding: 30px 35px;
+    }
+    
+    .account-info-container h2 {
+        font-size: 2rem;
+    }
+    
+    .group-grid {
+        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        gap: 16px;
+    }
+    
+    .field-group {
+        padding: 25px;
+    }
+    
+    .info-item .value {
+        font-size: 1.05rem;
+    }
+}
+
+/* Tablet (768px-1023px) */
+@media (max-width: 1023px) and (min-width: 768px) {
+    .account-info-container {
+        padding: 25px 30px;
+    }
+    
+    .account-info-container h2 {
+        font-size: 1.8rem;
+        margin-bottom: 25px;
+    }
+    
+    .account-sections {
+        gap: 25px;
+    }
+    
+    .field-group {
+        padding: 22px;
+    }
+    
+    .group-grid {
+        grid-template-columns: 1fr;
+        gap: 12px;
+    }
+    
+    .info-item {
+        padding: 16px 20px;
+        flex-wrap: wrap;
+    }
+    
+    .info-item .label {
+        font-size: 0.9rem;
+        flex-basis: 100%;
+        margin-bottom: 5px;
+        margin-right: 0;
+    }
+    
+    .info-item .value {
+        font-size: 1rem;
+        flex-basis: 100%;
+        text-align: left;
     }
     
     .group-title {
+        font-size: 1.2rem;
+    }
+}
+
+/* Large Mobile (600px-767px) */
+@media (max-width: 767px) and (min-width: 600px) {
+    .account-info-container {
+        padding: 20px 25px;
+    }
+    
+    .account-info-container h2 {
+        font-size: 1.6rem;
+    }
+    
+    .field-group {
+        padding: 20px;
+    }
+    
+    .group-title {
+        font-size: 1.1rem;
+        margin-bottom: 20px;
+    }
+    
+    .info-item {
+        padding: 14px 18px;
+    }
+    
+    .info-item .label {
+        font-size: 0.85rem;
+    }
+    
+    .info-item .value {
         font-size: 0.95rem;
-        margin-bottom: 10px;
+    }
+}
+
+/* Medium Mobile (480px-599px) */
+@media (max-width: 599px) and (min-width: 480px) {
+    .account-info-container {
+        padding: 18px 20px;
+    }
+    
+    .account-info-container h2 {
+        font-size: 1.5rem;
+    }
+    
+    .field-group {
+        padding: 18px;
+        margin: 0 -10px;
+    }
+    
+    .group-title {
+        font-size: 1rem;
+        margin-bottom: 18px;
     }
     
     .info-item {
         flex-direction: column;
         align-items: flex-start;
-        padding: 8px 10px;
+        gap: 6px;
+        padding: 12px 16px;
     }
     
-    .label, .value {
+    .info-item .label {
+        font-size: 0.8rem;
+        font-weight: 700;
+    }
+    
+    .info-item .value {
+        font-size: 0.9rem;
+        font-weight: 700;
+    }
+}
+
+/* Small Mobile (≤479px) */
+@media (max-width: 479px) {
+    .account-info-container {
+        padding: 15px 12px;
+    }
+    
+    .account-info-container h2 {
+        font-size: 1.3rem;
+        margin-bottom: 20px;
+    }
+    
+    .account-sections {
+        gap: 20px;
+    }
+    
+    .field-group {
+        padding: 15px;
+        margin: 0 -8px;
+        border-radius: 8px;
+    }
+    
+    .group-title {
+        font-size: 0.9rem;
+        margin-bottom: 15px;
+        letter-spacing: 0.8px;
+    }
+    
+    .info-item {
+        padding: 10px 14px;
+        gap: 5px;
+    }
+    
+    .info-item .label {
+        font-size: 0.75rem;
+        text-transform: none;
+        letter-spacing: 0.2px;
+    }
+    
+    .info-item .value {
         font-size: 0.85rem;
-        text-align: left;
-    }
-    
-    .value {
-        margin-top: 4px;
         font-weight: 700;
     }
 } 

@@ -185,6 +185,7 @@ const TradingBot = ({ socket }) => {
 
   return (
     <div className="trading-bot-container">
+      {/* Header */}
       <div className="bot-header">
         <h2>Trading Bot Control</h2>
         <div className={`bot-status ${botStatus.is_running ? 'running' : 'stopped'}`}>
@@ -193,143 +194,172 @@ const TradingBot = ({ socket }) => {
         </div>
       </div>
 
-      <div className="bot-controls">
-        <div className="control-group">
-          <label>Strategy:</label>
-          <select 
-            value={selectedStrategy} 
-            onChange={(e) => setSelectedStrategy(e.target.value)}
-            disabled={botStatus.is_running}
-          >
-            {strategies.map(strategy => (
-              <option key={strategy} value={strategy}>{strategy}</option>
-            ))}
-          </select>
+      <div className="bot-sections">
+        {/* Bot Controls */}
+        <div className="bot-controls">
+          <h3>Controls</h3>
+          <div className="control-group">
+            <div className="control-item">
+              <label>Strategy:</label>
+              <select 
+                value={selectedStrategy} 
+                onChange={(e) => setSelectedStrategy(e.target.value)}
+                disabled={botStatus.is_running}
+                className="strategy-select"
+              >
+                {strategies.map(strategy => (
+                  <option key={strategy} value={strategy}>{strategy}</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="bot-buttons">
+              <button 
+                onClick={startBot} 
+                disabled={botStatus.is_running || loading}
+                className="start-btn black-btn"
+              >
+                {loading ? 'Starting...' : 'Start Bot'}
+              </button>
+              <button 
+                onClick={stopBot} 
+                disabled={!botStatus.is_running || loading}
+                className="stop-btn"
+              >
+                {loading ? 'Stopping...' : 'Stop Bot'}
+              </button>
+            </div>
+          </div>
         </div>
 
-        <div className="bot-buttons">
+        {/* Performance Section */}
+        <div className="bot-performance">
+          <h3>Performance</h3>
+          <div className="performance-grid">
+            <div className="performance-item">
+              <span className="label">Total Trades</span>
+              <span className="value">{botStatus.performance.total_trades || 0}</span>
+            </div>
+            <div className="performance-item">
+              <span className="label">Active Trades</span>
+              <span className="value">{botStatus.active_trades || 0}</span>
+            </div>
+            <div className="performance-item">
+              <span className="label">Win Rate</span>
+              <span className="value profit">{((botStatus.performance.win_rate || 0) * 100).toFixed(2)}%</span>
+            </div>
+            <div className="performance-item">
+              <span className="label">Daily P&L</span>
+              <span className={`value ${botStatus.performance.daily_pnl >= 0 ? 'profit' : 'loss'}`}>
+                ${(botStatus.performance.daily_pnl || 0).toFixed(2)}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* Configuration Section */}
+        <div className="bot-config">
+          <h3>Configuration</h3>
+          <div className="config-grid">
+            <div className="config-item">
+              <label>Max Risk per Trade:</label>
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                max="1"
+                value={config.max_risk_per_trade}
+                onChange={(e) => handleConfigChange('max_risk_per_trade', parseFloat(e.target.value))}
+                className="config-input"
+              />
+            </div>
+            <div className="config-item">
+              <label>Max Daily Trades:</label>
+              <input
+                type="number"
+                min="1"
+                value={config.max_daily_trades}
+                onChange={(e) => handleConfigChange('max_daily_trades', parseInt(e.target.value))}
+                className="config-input"
+              />
+            </div>
+            <div className="config-item">
+              <label>Stop Loss (pips):</label>
+              <input
+                type="number"
+                min="1"
+                value={config.stop_loss_pips}
+                onChange={(e) => handleConfigChange('stop_loss_pips', parseInt(e.target.value))}
+                className="config-input"
+              />
+            </div>
+            <div className="config-item">
+              <label>Take Profit (pips):</label>
+              <input
+                type="number"
+                min="1"
+                value={config.take_profit_pips}
+                onChange={(e) => handleConfigChange('take_profit_pips', parseInt(e.target.value))}
+                className="config-input"
+              />
+            </div>
+            <div className="config-item checkbox-item">
+              <label className="checkbox-label">
+                <input
+                  type="checkbox"
+                  checked={config.auto_trading_enabled}
+                  onChange={(e) => handleConfigChange('auto_trading_enabled', e.target.checked)}
+                  className="config-checkbox"
+                />
+                <span>Enable auto trading</span>
+              </label>
+            </div>
+          </div>
           <button 
-            onClick={startBot} 
-            disabled={botStatus.is_running || loading}
-            className="start-btn"
+            onClick={updateConfig} 
+            className="update-config-btn black-btn"
           >
-            {loading ? 'Starting...' : 'Start Bot'}
-          </button>
-          <button 
-            onClick={stopBot} 
-            disabled={!botStatus.is_running || loading}
-            className="stop-btn"
-          >
-            {loading ? 'Stopping...' : 'Stop Bot'}
+            Update Configuration
           </button>
         </div>
-      </div>
 
-      <div className="bot-performance">
-        <h3>Performance</h3>
-        <div className="performance-grid">
-          <div className="performance-item">
-            <span>Total Trades:</span>
-            <span>{botStatus.performance.total_trades || 0}</span>
-          </div>
-          <div className="performance-item">
-            <span>Active Trades:</span>
-            <span>{botStatus.active_trades || 0}</span>
-          </div>
-          <div className="performance-item">
-            <span>Win Rate:</span>
-            <span>{((botStatus.performance.win_rate || 0) * 100).toFixed(2)}%</span>
-          </div>
-          <div className="performance-item">
-            <span>Daily P&L:</span>
-            <span className={botStatus.performance.daily_pnl >= 0 ? 'positive' : 'negative'}>
-              ${(botStatus.performance.daily_pnl || 0).toFixed(2)}
-            </span>
-          </div>
-        </div>
-      </div>
-
-      <div className="bot-config">
-        <h3>Configuration</h3>
-        <div className="config-grid">
-          <div className="config-item">
-            <label>Max Risk per Trade:</label>
-            <input
-              type="number"
-              step="0.01"
-              min="0"
-              max="1"
-              value={config.max_risk_per_trade}
-              onChange={(e) => handleConfigChange('max_risk_per_trade', parseFloat(e.target.value))}
-            />
-          </div>
-          <div className="config-item">
-            <label>Max Daily Trades:</label>
-            <input
-              type="number"
-              min="1"
-              value={config.max_daily_trades}
-              onChange={(e) => handleConfigChange('max_daily_trades', parseInt(e.target.value))}
-            />
-          </div>
-          <div className="config-item">
-            <label>Stop Loss (pips):</label>
-            <input
-              type="number"
-              min="1"
-              value={config.stop_loss_pips}
-              onChange={(e) => handleConfigChange('stop_loss_pips', parseInt(e.target.value))}
-            />
-          </div>
-          <div className="config-item">
-            <label>Take Profit (pips):</label>
-            <input
-              type="number"
-              min="1"
-              value={config.take_profit_pips}
-              onChange={(e) => handleConfigChange('take_profit_pips', parseInt(e.target.value))}
-            />
-          </div>
-          <div className="config-item">
-            <label>Auto Trading:</label>
-            <input
-              type="checkbox"
-              checked={config.auto_trading_enabled}
-              onChange={(e) => handleConfigChange('auto_trading_enabled', e.target.checked)}
-            />
-          </div>
-        </div>
-        <button onClick={updateConfig} className="update-config-btn">
-          Update Configuration
-        </button>
-      </div>
-
-      <div className="bot-updates">
-        <h3>Recent Updates</h3>
-        <div className="updates-list">
-          {botUpdates.length === 0 ? (
-            <div className="no-updates">No updates yet</div>
-          ) : (
-            botUpdates.map((update, index) => (
-              <div key={index} className="update-item">
-                <div className="update-time">{formatUpdateTime(update.timestamp)}</div>
-                <div className="update-type">{update.type}</div>
-                <div className="update-content">
-                  {update.signal && (
-                    <span className={`signal ${update.signal.type?.toLowerCase()}`}>
-                      {update.signal.type} @ ${update.signal.price?.toFixed(4)}
-                    </span>
-                  )}
-                  {update.current_price && (
-                    <span>Price: ${update.current_price.toFixed(4)}</span>
-                  )}
-                  {update.status && (
-                    <span className="status">{update.status}</span>
-                  )}
+        {/* Recent Updates Section */}
+        <div className="bot-updates">
+          <h3>Recent Updates</h3>
+          <div className="updates-list">
+            {botUpdates.length === 0 ? (
+              <div className="no-updates">No updates yet</div>
+            ) : (
+              botUpdates.map((update, index) => (
+                <div key={index} className="update-item">
+                  <div className="update-indicator"></div>
+                  <div className="update-content">
+                    <div className="update-header">
+                      <span className="update-type">{update.type}</span>
+                      <span className="update-time">{formatUpdateTime(update.timestamp)}</span>
+                    </div>
+                    <div className="update-details">
+                      {update.signal && (
+                        <span className={`signal-badge ${update.signal.type?.toLowerCase()}`}>
+                          {update.signal.type} @ ${update.signal.price?.toFixed(4)}
+                        </span>
+                      )}
+                      {update.current_price && (
+                        <span className="price-badge">
+                          Price: ${update.current_price.toFixed(4)}
+                        </span>
+                      )}
+                      {update.status && (
+                        <span className="status-badge">
+                          {update.status}
+                        </span>
+                      )}
+                    </div>
+                  </div>
                 </div>
-              </div>
-            ))
-          )}
+              ))
+            )}
+          </div>
         </div>
       </div>
     </div>

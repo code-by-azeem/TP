@@ -1,316 +1,1227 @@
-/* frontend/src/components/CandlestickChart.css */
-.chart-section {
-    margin: 20px 0;
-    padding: 0;
+/* frontend/src/components/CandlestickChart.css - TradePulse Branding */
+.candlestick-chart {
     width: 100%;
-    display: flex;
-    flex-direction: column;
-    align-items: stretch;
-    border-radius: 0;
-    background: linear-gradient(to bottom, rgba(22, 27, 39, 0.8), rgba(17, 23, 33, 0.9));
-    box-shadow: 0 15px 35px rgba(0, 0, 0, 0.3);
-    border: 1px solid rgba(63, 169, 245, 0.1);
-    border-left: none;
-    border-right: none;
+    height: 100%;
+    background: #1f2937;
+    border-radius: 8px;
     overflow: hidden;
+    position: relative;
 }
 
-.controls {
-    width: 100%;
-    padding: 15px 20px;
-    background: rgba(20, 25, 38, 0.9);
-    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+.chart-controls {
     display: flex;
     align-items: center;
-    gap: 15px;
+    justify-content: space-between;
     flex-wrap: wrap;
+    gap: 12px;
+    padding: 12px 16px;
+    background: linear-gradient(90deg, #374151 0%, #4b5563 100%);
+    border-bottom: 1px solid #52c41a;
 }
 
-.controls label {
+.chart-controls label {
+    color: #e5e7eb;
     font-weight: 500;
-    color: #e0e0e0;
-    font-size: 0.9rem;
-    letter-spacing: 0.5px;
+    font-size: 0.875rem;
+    margin-right: 8px;
 }
 
-.controls select {
-    padding: 8px 16px;
-    border: 1px solid rgba(63, 169, 245, 0.3);
-    border-radius: 8px;
-    font-size: 0.9rem;
-    background-color: rgba(13, 20, 33, 0.9);
-    color: #f0f0f0;
-    cursor: pointer;
-    transition: all 0.3s ease;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
-    -webkit-appearance: none;
-    appearance: none;
-    background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='rgba(255, 255, 255, 0.5)' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
-    background-repeat: no-repeat;
-    background-position: right 10px center;
-    background-size: 1em;
-    padding-right: 30px;
+.chart-controls select {
+    background-color: #1f2937;
+    border: 1px solid #52c41a;
+    border-radius: 6px;
+    color: white;
+    padding: 6px 12px;
+    font-size: 0.875rem;
+    transition: all 0.2s ease;
     min-width: 120px;
 }
 
-.controls select:hover:not(:disabled) {
-    border-color: rgba(63, 169, 245, 0.7);
-    background-color: rgba(19, 29, 45, 0.9);
-    transform: translateY(-2px);
+.chart-controls select:focus {
+    outline: none;
+    border-color: #73d13d;
+    box-shadow: 0 0 0 3px rgba(82, 196, 26, 0.2);
+}
+
+.chart-controls select:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* Connection status styling */
+.connection-status {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 12px;
+    border-radius: 6px;
+    font-size: 0.875rem;
+    font-weight: 500;
+    white-space: nowrap;
+}
+
+.connection-status.connected {
+    background: rgba(82, 196, 26, 0.15);
+    color: #52c41a;
+    border: 1px solid rgba(82, 196, 26, 0.3);
+}
+
+.connection-status.disconnected {
+    background: rgba(239, 68, 68, 0.15);
+    color: #ef4444;
+    border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+.status-icon {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: currentColor;
+    animation: pulse 2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+    0%, 100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.5;
+    }
+}
+
+/* Chart container - Full viewport usage */
+.chart-container {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    background: #111827;
+    border-radius: 0 0 8px 8px;
+    overflow: hidden;
+    flex: 1;
+}
+
+/* Ensure chart fills full space */
+.chart-container > div {
+    width: 100% !important;
+    height: 100% !important;
+}
+
+/* TRUE FULLSCREEN MODE - Complete viewport coverage */
+.chart-container.fullscreen,
+.chart-container:fullscreen,
+.chart-container:-webkit-full-screen,
+.chart-container:-moz-full-screen,
+.chart-container:-ms-fullscreen {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: 100vw !important;
+    height: 100vh !important;
+    z-index: 9999 !important;
+    border-radius: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    max-height: none !important;
+    max-width: none !important;
+    border: none !important;
+    background: #111827 !important;
+}
+
+/* Fullscreen chart content */
+.chart-container.fullscreen > div,
+.chart-container:fullscreen > div,
+.chart-container:-webkit-full-screen > div,
+.chart-container:-moz-full-screen > div,
+.chart-container:-ms-fullscreen > div {
+    width: 100vw !important;
+    height: 100vh !important;
+    position: absolute !important;
+    top: 0 !important;
+    left: 0 !important;
+}
+
+/* Fullscreen controls positioning */
+.chart-container.fullscreen .chart-controls,
+.chart-container:fullscreen .chart-controls,
+.chart-container:-webkit-full-screen .chart-controls,
+.chart-container:-moz-full-screen .chart-controls,
+.chart-container:-ms-fullscreen .chart-controls {
+    position: absolute !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    z-index: 10000 !important;
+    background: rgba(55, 65, 81, 0.95) !important;
+    backdrop-filter: blur(10px) !important;
+}
+
+/* Fullscreen toggle button - always visible */
+.fullscreen-toggle {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    padding: 10px;
+    background: rgba(31, 41, 55, 0.95);
+    border: 1px solid #374151;
+    border-radius: 8px;
+    color: #9ca3af;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    z-index: 10001;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    backdrop-filter: blur(5px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.fullscreen-toggle:hover {
+    background: rgba(55, 65, 81, 0.95);
+    color: #52c41a;
+    border-color: #52c41a;
+    transform: scale(1.05);
+    box-shadow: 0 6px 16px rgba(82, 196, 26, 0.2);
+}
+
+.fullscreen-toggle svg {
+    width: 20px;
+    height: 20px;
+    transition: transform 0.2s ease;
+}
+
+.fullscreen-toggle:hover svg {
+    transform: scale(1.1);
+}
+
+/* Fullscreen button positioning in fullscreen mode */
+.chart-container.fullscreen .fullscreen-toggle,
+.chart-container:fullscreen .fullscreen-toggle,
+.chart-container:-webkit-full-screen .fullscreen-toggle,
+.chart-container:-moz-full-screen .fullscreen-toggle,
+.chart-container:-ms-fullscreen .fullscreen-toggle {
+    position: fixed !important;
+    top: 20px !important;
+    right: 20px !important;
+    z-index: 10001 !important;
+    background: rgba(31, 41, 55, 0.9) !important;
+    backdrop-filter: blur(10px) !important;
+}
+
+/* Status bar at bottom of chart */
+.chart-status-bar {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 12px;
+    padding: 8px 12px;
+    background: rgba(17, 24, 39, 0.95);
+    border-top: 1px solid #374151;
+    font-size: 0.75rem;
+    backdrop-filter: blur(4px);
+}
+
+.chart-status-item {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    white-space: nowrap;
+}
+
+.status-label {
+    color: #9ca3af;
+    font-weight: 500;
+}
+
+.status-value {
+    color: #ffffff;
+    font-weight: 600;
+}
+
+.status-ok {
+    color: #52c41a !important;
+}
+
+.status-error {
+    color: #ef4444 !important;
+}
+
+.status-warn {
+    color: #facc15 !important;
+}
+
+/* Live update indicator */
+.live-indicator {
+    position: relative;
+    margin-left: auto;
+}
+
+.pulse {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #52c41a;
+    opacity: 0.3;
+    transition: opacity 0.3s ease;
+}
+
+.pulse.active {
+    opacity: 1;
+    animation: pulse-glow 1s ease-in-out infinite;
+}
+
+@keyframes pulse-glow {
+    0%, 100% {
+        transform: scale(1);
+        opacity: 1;
+    }
+    50% {
+        transform: scale(1.3);
+        opacity: 0.6;
+    }
+}
+
+/* Loading states */
+.status-loading {
+    color: #facc15;
+    font-size: 0.875rem;
+}
+
+.status-error {
+    color: #ef4444;
+    font-size: 0.875rem;
+}
+
+/* Chart placeholder when there's an error */
+.chart-placeholder-error {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 200px;
+    background: #374151;
+    border-radius: 8px;
+    color: #ef4444;
+    font-size: 1rem;
+    text-align: center;
+    margin: 16px;
+}
+
+/* Responsive design */
+@media (max-width: 1024px) {
+    .chart-container {
+        min-height: calc(100vh - 200px);
+        border-radius: 0 0 6px 6px;
+    }
+    
+    .chart-controls {
+        padding: 10px 14px;
+        gap: 10px;
+    }
+    
+    .chart-controls select {
+        min-width: 100px;
+        padding: 5px 10px;
+    }
+}
+
+@media (max-width: 768px) {
+    .chart-controls {
+        flex-direction: column;
+        align-items: stretch;
+        padding: 12px 15px;
+        gap: 12px;
+    }
+
+    .chart-controls select {
+        min-width: auto;
+        width: 100%;
+        padding: 8px 12px;
+        font-size: 0.9rem;
+    }
+
+    .chart-container {
+        min-height: calc(100vh - 220px);
+        border-radius: 0;
+    }
+
+    .chart-status-bar {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 8px;
+        padding: 8px 12px;
+    }
+
+    .chart-status-item {
+        justify-content: space-between;
+        width: 100%;
+    }
+
+    .connection-status {
+        justify-content: center;
+        width: 100%;
+    }
+
+    .fullscreen-toggle {
+        top: 8px;
+        right: 8px;
+        padding: 6px;
+    }
+}
+
+@media (max-width: 640px) {
+    .chart-container {
+        min-height: calc(100vh - 180px);
+        border-radius: 0;
+    }
+
+    .chart-controls {
+        padding: 10px 12px;
+        gap: 10px;
+    }
+
+    .chart-status-bar {
+        padding: 6px 10px;
+        font-size: 0.7rem;
+    }
+
+    .chart-status-item {
+        gap: 6px;
+    }
+
+    .connection-status {
+        padding: 6px 12px;
+        font-size: 0.8rem;
+    }
+}
+
+@media (max-width: 480px) {
+    .chart-status-item:nth-child(n+4) {
+        display: none; /* Hide additional status items on very small screens */
+    }
+    
+    .chart-container {
+        min-height: calc(100vh - 160px);
+    }
+    
+    .chart-controls {
+        padding: 8px 10px;
+    }
+    
+    .chart-controls select {
+        padding: 6px 10px;
+        font-size: 0.85rem;
+    }
+    
+    .fullscreen-toggle {
+        top: 6px;
+        right: 6px;
+        padding: 5px;
+    }
+    
+    .fullscreen-toggle svg {
+        width: 14px;
+        height: 14px;
+    }
+}
+
+/* Chart tooltip styling - Fix for date/time visibility */
+.tv-lightweight-charts {
+    width: 100% !important;
+    height: 100% !important;
+}
+
+/* Tooltip text color fixes */
+.tv-lightweight-charts .pane-legend-line {
+    color: #ffffff !important;
+}
+
+.tv-lightweight-charts .pane-legend-item {
+    color: #ffffff !important;
+}
+
+.tv-lightweight-charts .pane-legend-item-title {
+    color: #e5e7eb !important;
+}
+
+.tv-lightweight-charts .pane-legend-item-value {
+    color: #ffffff !important;
+}
+
+/* Crosshair label colors */
+.tv-lightweight-charts .crosshair-label {
+    background-color: #1f2937 !important;
+    color: #ffffff !important;
+    border: 1px solid #52c41a !important;
+}
+
+/* Time scale tooltip */
+.tv-lightweight-charts .time-axis .crosshair-label {
+    background-color: #1f2937 !important;
+    color: #ffffff !important;
+    border: 1px solid #52c41a !important;
+}
+
+/* Price scale tooltip */
+.tv-lightweight-charts .price-axis .crosshair-label {
+    background-color: #1f2937 !important;
+    color: #ffffff !important;
+    border: 1px solid #52c41a !important;
+}
+
+/* Ensure tooltip text is visible */
+.tv-lightweight-charts div[style*="color"] {
+    color: #ffffff !important;
+}
+
+.tv-lightweight-charts span[style*="color"] {
+    color: #ffffff !important;
+}
+
+/* Legend text fixes */
+.tv-lightweight-charts .legend-series-item {
+    color: #ffffff !important;
+}
+
+.tv-lightweight-charts .legend-series-item-title {
+    color: #e5e7eb !important;
+}
+
+.tv-lightweight-charts .legend-series-item-value {
+    color: #ffffff !important;
+}
+
+/* CandlestickChart.css - Professional Full-Width Chart */
+
+/* Chart section container */
+.chart-section {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    background: transparent;
+    border-radius: 12px;
+    overflow: hidden;
+}
+
+/* Controls section */
+.controls {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 15px 20px;
+    background: linear-gradient(90deg, rgba(31, 41, 55, 0.9), rgba(55, 65, 81, 0.9));
+    border-bottom: 1px solid rgba(82, 196, 26, 0.3);
+    flex-wrap: wrap;
+    gap: 15px;
+    min-height: 60px;
+}
+
+.controls label {
+    color: #52c41a;
+    font-weight: 600;
+    font-size: 0.9rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-right: 10px;
+}
+
+.controls select {
+    background: rgba(31, 41, 55, 0.8);
+    border: 1px solid rgba(82, 196, 26, 0.3);
+    border-radius: 6px;
+    color: white;
+    padding: 8px 12px;
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    min-width: 120px;
 }
 
 .controls select:focus {
     outline: none;
-    border-color: #3FA9F5;
-    box-shadow: 0 0 0 3px rgba(63, 169, 245, 0.2);
+    border-color: #52c41a;
+    box-shadow: 0 0 0 3px rgba(82, 196, 26, 0.2);
 }
 
 .controls select:disabled {
-    opacity: 0.6;
+    opacity: 0.5;
     cursor: not-allowed;
 }
 
-.status-loading,
-.status-error {
-    font-style: normal;
-    padding: 6px 12px;
-    border-radius: 8px;
-    font-size: 0.85rem;
-    animation: pulse 2s infinite ease-in-out;
-    font-weight: 500;
-    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.15);
+/* Connection status */
+.connection-status {
     display: flex;
     align-items: center;
-    gap: 6px;
-}
-
-.status-loading::before,
-.status-error::before {
-    content: "";
-    display: inline-block;
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-}
-
-.status-loading {
-    color: #FFB74D;
-    background-color: rgba(255, 183, 77, 0.15);
-    border: 1px solid rgba(255, 183, 77, 0.3);
-}
-
-.status-loading::before {
-    background-color: #FFB74D;
-    animation: blink 1s infinite alternate;
-}
-
-.status-error {
-    color: #FF5252;
-    background-color: rgba(255, 82, 82, 0.15);
-    border: 1px solid rgba(255, 82, 82, 0.3);
-}
-
-.status-error::before {
-    background-color: #FF5252;
-}
-
-.chart-container {
-    width: 100%;
-    height: calc(100vh - 300px);
-    min-height: 400px;
-    max-height: 800px;
-    position: relative;
-    background-color: black;
-    overflow: hidden;
-    border-radius: 0;
-}
-
-.chart-placeholder-error {
-    width: 100%;
-    height: 100%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: #bbb;
-    background-color: rgba(17, 17, 17, 0.8);
-    border: 1px dashed rgba(255, 255, 255, 0.2);
-    text-align: center;
-    border-radius: 8px;
-    font-size: 1rem;
-    padding: 20px;
-}
-
-/* Status Indicator Styles */
-.status-indicator {
-    margin-left: auto;
-    padding: 6px 12px;
+    gap: 8px;
+    padding: 8px 16px;
     border-radius: 20px;
     font-size: 0.85rem;
     font-weight: 500;
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    transition: all 0.3s ease;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-    animation: glow 3s infinite alternate;
-}
-
-.status-indicator.connected {
-    color: #4CAF50;
-    background-color: rgba(76, 175, 80, 0.15);
-    border: 1px solid rgba(76, 175, 80, 0.3);
-}
-
-.status-indicator.disconnected {
-    color: #FF5252;
-    background-color: rgba(255, 82, 82, 0.15);
-    border: 1px solid rgba(255, 82, 82, 0.3);
-}
-
-/* Diagnostic panel styles */
-.diagnostic-panel {
-    position: absolute;
-    right: 20px;
-    top: 20px;
-    background: rgba(15, 23, 42, 0.85);
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
-    border: 1px solid rgba(63, 169, 245, 0.2);
-    border-radius: 10px;
-    padding: 15px;
-    color: white;
-    font-size: 0.85rem;
-    max-width: 400px;
-    z-index: 100;
-    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.5);
-    overflow: hidden;
     transition: all 0.3s ease;
 }
 
-.diagnostic-panel h3 {
-    margin-top: 0;
-    margin-bottom: 12px;
-    font-size: 1rem;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    color: #3FA9F5;
-    letter-spacing: 0.5px;
-    border-bottom: 1px solid rgba(63, 169, 245, 0.2);
-    padding-bottom: 8px;
+.connection-status.connected {
+    background: rgba(82, 196, 26, 0.15);
+    color: #52c41a;
+    border: 1px solid rgba(82, 196, 26, 0.3);
 }
 
-.diagnostic-panel .close-button {
-    background: none;
-    border: none;
-    color: white;
-    cursor: pointer;
-    font-size: 1.2rem;
-    padding: 0;
-    margin: 0;
-    transition: all 0.2s ease;
+.connection-status.disconnected {
+    background: rgba(239, 68, 68, 0.15);
+    color: #ef4444;
+    border: 1px solid rgba(239, 68, 68, 0.3);
 }
 
-.diagnostic-panel .close-button:hover {
-    color: #FF5252;
-    transform: scale(1.2);
+.status-icon {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: currentColor;
+    animation: pulse 2s infinite;
 }
 
-.diagnostic-panel ul {
-    margin: 0;
-    padding: 0 0 0 20px;
-    line-height: 1.6;
+.connection-status.connected .status-icon {
+    background: #52c41a;
+    box-shadow: 0 0 8px rgba(82, 196, 26, 0.7);
 }
 
-.diagnostic-panel li {
-    margin-bottom: 6px;
-}
-
-.diagnostic-panel .status-good {
-    color: #4CAF50;
-    font-weight: 500;
-}
-
-.diagnostic-panel .status-warn {
-    color: #FF9800;
-    font-weight: 500;
-}
-
-.diagnostic-panel .status-error {
-    color: #FF5252;
-    font-weight: 500;
-}
-
-.diagnostic-panel button {
-    background: rgba(63, 169, 245, 0.2);
-    color: #3FA9F5;
-    border: 1px solid rgba(63, 169, 245, 0.3);
-    border-radius: 6px;
-    padding: 8px 12px;
-    font-size: 0.85rem;
-    cursor: pointer;
-    transition: all 0.2s ease;
-    margin-top: 10px;
-}
-
-.diagnostic-panel button:hover {
-    background: rgba(63, 169, 245, 0.3);
-    transform: translateY(-2px);
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
-}
-
-.diagnostic-toggle {
-    position: absolute;
-    right: 15px;
-    bottom: 15px;
-    background: rgba(15, 23, 42, 0.85);
-    backdrop-filter: blur(5px);
-    -webkit-backdrop-filter: blur(5px);
-    color: white;
-    border: 1px solid rgba(63, 169, 245, 0.3);
-    border-radius: 6px;
-    padding: 8px 12px;
-    font-size: 0.85rem;
-    cursor: pointer;
-    z-index: 100;
-    transition: all 0.2s ease;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-}
-
-.diagnostic-toggle:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 6px 15px rgba(0, 0, 0, 0.4);
-    border-color: rgba(63, 169, 245, 0.5);
+.connection-status.disconnected .status-icon {
+    background: #ef4444;
+    animation: none;
 }
 
 @keyframes pulse {
-    0% { opacity: 0.7; }
-    50% { opacity: 1; }
-    100% { opacity: 0.7; }
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
 }
 
-@keyframes blink {
-    from { opacity: 0.4; }
-    to { opacity: 1; }
+/* Chart container - Full width and height */
+.chart-container {
+    position: relative;
+    width: 100%;
+    height: calc(100vh - 280px);
+    min-height: 500px;
+    background: linear-gradient(135deg, #1f2937 0%, #111827 100%);
+    border-radius: 0 0 12px 12px;
+    overflow: hidden;
+    flex: 1;
 }
 
-@keyframes glow {
-    0% { box-shadow: 0 0 5px rgba(63, 169, 245, 0.3); }
-    100% { box-shadow: 0 0 15px rgba(63, 169, 245, 0.5); }
+/* Fullscreen toggle button */
+.fullscreen-toggle {
+    position: absolute;
+    top: 15px;
+    right: 15px;
+    padding: 10px;
+    background: rgba(31, 41, 55, 0.9);
+    border: 1px solid rgba(82, 196, 26, 0.3);
+    border-radius: 8px;
+    color: #52c41a;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    z-index: 10;
+    backdrop-filter: blur(10px);
 }
 
-/* Enhanced responsive styles */
-@media (max-width: 480px) {
+.fullscreen-toggle:hover {
+    background: rgba(82, 196, 26, 0.1);
+    border-color: #52c41a;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(82, 196, 26, 0.3);
+}
+
+.fullscreen-toggle svg {
+    display: block;
+    transition: transform 0.3s ease;
+}
+
+.fullscreen-toggle:hover svg {
+    transform: scale(1.1);
+}
+
+/* Error placeholder */
+.chart-placeholder-error {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 200px;
+    background: rgba(55, 65, 81, 0.8);
+    border-radius: 8px;
+    color: #ef4444;
+    font-size: 1rem;
+    font-weight: 500;
+    margin: 20px;
+    border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+/* Chart tooltip improvements for visibility */
+.tv-lightweight-charts {
+    width: 100% !important;
+    height: 100% !important;
+}
+
+/* Override lightweight-charts tooltip styles for better visibility */
+div[class*="crosshair"] {
+    color: white !important;
+    background: rgba(31, 41, 55, 0.95) !important;
+    border: 1px solid rgba(82, 196, 26, 0.3) !important;
+    border-radius: 6px !important;
+    padding: 8px 12px !important;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+    font-size: 13px !important;
+    backdrop-filter: blur(10px) !important;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3) !important;
+}
+
+/* Tooltip text color fixes */
+div[class*="crosshair"] * {
+    color: white !important;
+}
+
+/* Time and date in tooltip */
+div[class*="crosshair"] div:first-child {
+    color: #52c41a !important;
+    font-weight: 600 !important;
+    margin-bottom: 4px !important;
+}
+
+/* OHLC values in tooltip */
+div[class*="crosshair"] div:not(:first-child) {
+    color: #e5e7eb !important;
+    font-weight: 500 !important;
+}
+
+/* Price labels on axis */
+div[class*="pane"] div[class*="price-axis"] {
+    color: #e5e7eb !important;
+    background: rgba(31, 41, 55, 0.8) !important;
+}
+
+/* Time labels on axis */
+div[class*="pane"] div[class*="time-axis"] {
+    color: #e5e7eb !important;
+    background: rgba(31, 41, 55, 0.8) !important;
+}
+
+/* Chart grid lines */
+div[class*="pane"] canvas {
+    filter: contrast(1.1) brightness(1.05);
+}
+
+/* Responsive design */
+@media (max-width: 1200px) {
+    .chart-container {
+        height: calc(100vh - 260px);
+        min-height: 450px;
+    }
+    
+    .controls {
+        padding: 12px 15px;
+    }
+}
+
+@media (max-width: 768px) {
+    .controls {
+        flex-direction: column;
+        align-items: flex-start;
+        padding: 12px 15px;
+        gap: 12px;
+        min-height: auto;
+    }
+    
+    .controls label {
+        font-size: 0.85rem;
+        margin-right: 8px;
+    }
+    
+    .controls select {
+        width: 100%;
+        max-width: 200px;
+        font-size: 0.85rem;
+        padding: 8px 12px;
+    }
+    
+    .connection-status {
+        font-size: 0.8rem;
+        padding: 6px 12px;
+        align-self: center;
+    }
+    
+    .fullscreen-toggle {
+        padding: 8px;
+        top: 10px;
+        right: 10px;
+    }
+    
+    .fullscreen-toggle svg {
+        width: 16px;
+        height: 16px;
+    }
+}
+
+@media (max-width: 640px) {
+    .chart-container {
+        height: calc(100vh - 220px);
+        min-height: 350px;
+    }
+    
+    .controls {
+        padding: 12px;
+    }
+    
+    .connection-status {
+        font-size: 0.8rem;
+        padding: 8px 12px;
+    }
+    
+    .chart-placeholder-error {
+        margin: 15px;
+        padding: 20px;
+        font-size: 0.9rem;
+    }
+}
+
+/* Fullscreen mode adjustments */
+.chart-container:fullscreen {
+    background: #1f2937;
+    border-radius: 0;
+}
+
+.chart-container:fullscreen .fullscreen-toggle {
+    background: rgba(31, 41, 55, 0.95);
+    backdrop-filter: blur(15px);
+}
+
+/* frontend/src/components/CandlestickChart.css - Professional Full-Screen Layout */
+
+/* Main Chart Section - Full Width Usage */
+.chart-section {
+    width: 100%;
+    height: calc(100vh - 200px);
+    background: #1f2937;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    border-radius: 0;
+    overflow: hidden;
+}
+
+/* Controls Section */
+.controls {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 15px;
+    padding: 15px 25px;
+    background: linear-gradient(90deg, #374151 0%, #4b5563 100%);
+    border-bottom: 2px solid #52c41a;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+    min-height: 70px;
+    box-sizing: border-box;
+}
+
+.controls label {
+    color: #e5e7eb;
+    font-weight: 600;
+    font-size: 0.9rem;
+    margin-right: 12px;
+    white-space: nowrap;
+}
+
+.controls select {
+    background-color: #1f2937;
+    border: 2px solid #52c41a;
+    border-radius: 8px;
+    color: white;
+    padding: 10px 16px;
+    font-size: 0.9rem;
+    font-weight: 500;
+    transition: all 0.3s ease;
+    min-width: 140px;
+    cursor: pointer;
+}
+
+.controls select:focus {
+    outline: none;
+    border-color: #73d13d;
+    box-shadow: 0 0 0 4px rgba(82, 196, 26, 0.2);
+    transform: translateY(-1px);
+}
+
+.controls select:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* Connection Status */
+.connection-status {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 16px;
+    border-radius: 8px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    white-space: nowrap;
+    transition: all 0.3s ease;
+}
+
+.connection-status.connected {
+    background: rgba(82, 196, 26, 0.15);
+    color: #52c41a;
+    border: 2px solid rgba(82, 196, 26, 0.3);
+    box-shadow: 0 0 10px rgba(82, 196, 26, 0.2);
+}
+
+.connection-status.disconnected {
+    background: rgba(239, 68, 68, 0.15);
+    color: #ef4444;
+    border: 2px solid rgba(239, 68, 68, 0.3);
+    box-shadow: 0 0 10px rgba(239, 68, 68, 0.2);
+}
+
+.status-icon {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: currentColor;
+    animation: pulse 2s ease-in-out infinite;
+}
+
+/* Chart Container - Improved Full Screen */
+.chart-container {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    flex: 1;
+    background: #111827;
+    overflow: hidden;
+    border-radius: 0;
+    margin: 0;
+    padding: 0;
+}
+
+/* Ensure chart fills container completely */
+.chart-container > div {
+    width: 100% !important;
+    height: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+}
+
+/* Fullscreen Toggle Button - Enhanced */
+.fullscreen-toggle {
+    position: absolute;
+    top: 15px;
+    right: 15px;
+    padding: 12px;
+    background: rgba(31, 41, 55, 0.95);
+    border: 2px solid #374151;
+    border-radius: 8px;
+    color: #9ca3af;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    backdrop-filter: blur(10px);
+}
+
+.fullscreen-toggle:hover {
+    background: rgba(55, 65, 81, 0.98);
+    color: #52c41a;
+    border-color: #52c41a;
+    transform: scale(1.1);
+    box-shadow: 0 4px 15px rgba(82, 196, 26, 0.3);
+}
+
+.fullscreen-toggle svg {
+    width: 18px;
+    height: 18px;
+    transition: all 0.3s ease;
+}
+
+.fullscreen-toggle:hover svg {
+    transform: scale(1.1);
+    stroke-width: 2.5;
+}
+
+/* Native Fullscreen Support */
+.chart-container:fullscreen {
+    width: 100vw !important;
+    height: 100vh !important;
+    background: #111827;
+    border-radius: 0;
+    padding: 0;
+    margin: 0;
+}
+
+.chart-container:fullscreen .fullscreen-toggle {
+    top: 20px;
+    right: 20px;
+    background: rgba(31, 41, 55, 0.98);
+    backdrop-filter: blur(15px);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+}
+
+.chart-container:-webkit-full-screen {
+    width: 100vw !important;
+    height: 100vh !important;
+    background: #111827;
+}
+
+.chart-container:-moz-full-screen {
+    width: 100vw !important;
+    height: 100vh !important;
+    background: #111827;
+}
+
+.chart-container:-ms-fullscreen {
+    width: 100vw !important;
+    height: 100vh !important;
+    background: #111827;
+}
+
+/* Chart Error State */
+.chart-placeholder-error {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    color: #ef4444;
+    font-size: 1.1rem;
+    font-weight: 600;
+    background: rgba(239, 68, 68, 0.1);
+    border: 2px dashed rgba(239, 68, 68, 0.3);
+    border-radius: 8px;
+    margin: 20px;
+    text-align: center;
+    padding: 40px;
+}
+
+/* TradingView Chart Specific Styling */
+.tv-lightweight-charts {
+    width: 100% !important;
+    height: 100% !important;
+    background: #111827 !important;
+}
+
+/* Fix crosshair and tooltip colors for better visibility */
+.tv-lightweight-charts .pane-legend-line {
+    color: #e5e7eb !important;
+}
+
+.tv-lightweight-charts .pane-legend-item {
+    color: #e5e7eb !important;
+}
+
+.tv-lightweight-charts .pane-legend-item-title {
+    color: #52c41a !important;
+}
+
+.tv-lightweight-charts .pane-legend-item-value {
+    color: #ffffff !important;
+    font-weight: 600 !important;
+}
+
+/* Enhanced crosshair labels */
+.tv-lightweight-charts .crosshair-label {
+    background: rgba(31, 41, 55, 0.95) !important;
+    color: #ffffff !important;
+    border: 1px solid #52c41a !important;
+    border-radius: 4px !important;
+    font-weight: 600 !important;
+    padding: 4px 8px !important;
+    backdrop-filter: blur(10px);
+}
+
+.tv-lightweight-charts .time-axis .crosshair-label {
+    background: rgba(31, 41, 55, 0.95) !important;
+    color: #ffffff !important;
+    border: 1px solid #52c41a !important;
+    font-weight: 600 !important;
+}
+
+.tv-lightweight-charts .price-axis .crosshair-label {
+    background: rgba(31, 41, 55, 0.95) !important;
+    color: #ffffff !important;
+    border: 1px solid #52c41a !important;
+    font-weight: 600 !important;
+}
+
+/* Improve all chart text visibility */
+.tv-lightweight-charts div[style*="color"] {
+    color: #e5e7eb !important;
+}
+
+.tv-lightweight-charts span[style*="color"] {
+    color: #e5e7eb !important;
+}
+
+/* Enhanced crosshair styling for better visibility */
+div[class*="crosshair"] {
+    z-index: 1000 !important;
+}
+
+div[class*="crosshair"] div {
+    background: rgba(31, 41, 55, 0.98) !important;
+    color: #ffffff !important;
+    border: 1px solid #52c41a !important;
+    border-radius: 6px !important;
+    font-weight: 600 !important;
+    padding: 6px 10px !important;
+    font-size: 13px !important;
+    backdrop-filter: blur(15px) !important;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3) !important;
+}
+
+/* Time axis crosshair */
+div[class*="crosshair"] div:first-child {
+    background: rgba(31, 41, 55, 0.98) !important;
+    color: #ffffff !important;
+    border-color: #52c41a !important;
+    font-weight: 600 !important;
+}
+
+/* Price axis crosshair */
+div[class*="crosshair"] div:not(:first-child) {
+    background: rgba(31, 41, 55, 0.98) !important;
+    color: #ffffff !important;
+    border-color: #52c41a !important;
+    font-weight: 600 !important;
+}
+
+/* Responsive Design - Desktop Large */
+@media (min-width: 1200px) {
     .chart-section {
-        margin: 10px 0;
-        border-radius: 0;
+        height: calc(100vh - 180px);
+    }
+    
+    .controls {
+        padding: 18px 30px;
+        gap: 20px;
+    }
+    
+    .controls select {
+        min-width: 160px;
+        font-size: 1rem;
+    }
+}
+
+/* Responsive Design - Tablet */
+@media (max-width: 1024px) {
+    .chart-section {
+        height: calc(100vh - 160px);
+    }
+    
+    .controls {
+        padding: 15px 20px;
+        gap: 12px;
+    }
+    
+    .controls select {
+        min-width: 120px;
+    }
+    
+    .fullscreen-toggle {
+        padding: 10px;
+        top: 12px;
+        right: 12px;
+    }
+}
+
+/* Responsive Design - Mobile Large */
+@media (max-width: 768px) {
+    .chart-section {
+        height: calc(100vh - 140px);
     }
     
     .controls {
         flex-direction: column;
-        align-items: stretch;
-        padding: 10px;
+        align-items: flex-start;
+        padding: 12px 15px;
+        gap: 12px;
+        min-height: auto;
+    }
+    
+    .controls label {
+        font-size: 0.85rem;
+        margin-right: 8px;
+    }
+    
+    .controls select {
+        width: 100%;
+        max-width: 200px;
+        font-size: 0.85rem;
+        padding: 8px 12px;
+    }
+    
+    .connection-status {
+        font-size: 0.8rem;
+        padding: 6px 12px;
+        align-self: center;
+    }
+    
+    .fullscreen-toggle {
+        padding: 8px;
+        top: 10px;
+        right: 10px;
+    }
+    
+    .fullscreen-toggle svg {
+        width: 16px;
+        height: 16px;
+    }
+}
+
+/* Responsive Design - Mobile Small */
+@media (max-width: 640px) {
+    .chart-section {
+        height: calc(100vh - 120px);
+    }
+    
+    .controls {
+        padding: 10px 12px;
         gap: 10px;
+    }
+    
+    .controls select {
+        max-width: 160px;
+    }
+    
+    .connection-status {
+        font-size: 0.75rem;
+        padding: 5px 10px;
+    }
+    
+    .status-icon {
+        width: 8px;
+        height: 8px;
+    }
+    
+    .chart-placeholder-error {
+        margin: 10px;
+        padding: 20px;
+        font-size: 0.9rem;
+    }
+}
+
+/* Responsive Design - Mobile Extra Small */
+@media (max-width: 480px) {
+    .chart-section {
+        height: calc(100vh - 100px);
+    }
+    
+    .controls {
+        padding: 8px 10px;
+        gap: 8px;
     }
     
     .controls label {
@@ -318,388 +1229,303 @@
     }
     
     .controls select {
-        padding: 6px 12px;
         font-size: 0.8rem;
-        min-width: 100px;
-    }
-    
-    .status-indicator {
-        width: 100%;
-        justify-content: center;
-        margin-left: 0;
-        margin-top: 8px;
-        padding: 5px 10px;
-        font-size: 0.8rem;
-    }
-    
-    .chart-container {
-        height: calc(100vh - 350px);
-        min-height: 300px;
-        max-height: 600px;
-    }
-    
-    .diagnostic-panel {
-        right: 10px;
-        top: 10px;
-        max-width: calc(100vw - 40px);
-        padding: 10px;
-        font-size: 0.8rem;
-    }
-    
-    .diagnostic-toggle,
-    .fullscreen-toggle {
-        right: 10px;
         padding: 6px 10px;
-        font-size: 0.8rem;
+        max-width: 140px;
+    }
+    
+    .connection-status {
+        font-size: 0.7rem;
+        padding: 4px 8px;
+    }
+    
+    .fullscreen-toggle {
+        padding: 6px;
+        top: 8px;
+        right: 8px;
+    }
+    
+    .fullscreen-toggle svg {
+        width: 14px;
+        height: 14px;
     }
 }
 
-@media (max-width: 768px) {
-    .chart-section {
-        margin: 15px 0;
+/* Animation for smooth transitions */
+@keyframes pulse {
+    0%, 100% {
+        opacity: 1;
+        transform: scale(1);
+    }
+    50% {
+        opacity: 0.6;
+        transform: scale(0.95);
+    }
+}
+
+/* Ensure chart canvas uses full dimensions */
+.chart-container canvas {
+    width: 100% !important;
+    height: 100% !important;
+}
+
+/* Force full screen usage for all chart elements */
+.candlestick-chart,
+.candlestick-chart > div,
+.candlestick-chart canvas {
+    width: 100% !important;
+    height: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border-radius: 0 !important;
+}
+
+/* Comprehensive Responsive Design for Chart */
+
+/* Large Desktop (1400px+) */
+@media (min-width: 1400px) {
+    .chart-controls {
+        padding: 16px 20px;
+        gap: 15px;
     }
     
-    .controls {
-        flex-direction: column;
-        align-items: stretch;
+    .chart-controls select {
+        padding: 12px 16px;
+        font-size: 1rem;
+        min-width: 140px;
+    }
+    
+    .fullscreen-toggle {
         padding: 12px;
+        top: 15px;
+        right: 15px;
+    }
+    
+    .fullscreen-toggle svg {
+        width: 22px;
+        height: 22px;
+    }
+}
+
+/* Standard Desktop (1200px-1399px) */
+@media (max-width: 1399px) and (min-width: 1200px) {
+    .chart-controls {
+        padding: 14px 18px;
         gap: 12px;
     }
     
-    .status-indicator {
+    .chart-controls select {
+        padding: 10px 14px;
+        font-size: 0.95rem;
+        min-width: 120px;
+    }
+}
+
+/* Small Desktop/Large Tablet (1024px-1199px) */
+@media (max-width: 1199px) and (min-width: 1024px) {
+    .chart-container {
+        border-radius: 0 0 6px 6px;
+    }
+    
+    .chart-controls {
+        padding: 12px 16px;
+        gap: 10px;
+    }
+    
+    .chart-controls select {
+        min-width: 110px;
+        padding: 8px 12px;
+        font-size: 0.9rem;
+    }
+    
+    .fullscreen-toggle {
+        padding: 8px;
+        top: 10px;
+        right: 10px;
+    }
+}
+
+/* Tablet (768px-1023px) */
+@media (max-width: 1023px) and (min-width: 768px) {
+    .chart-controls {
+        flex-direction: column;
+        align-items: stretch;
+        padding: 15px 18px;
+        gap: 15px;
+    }
+
+    .chart-controls select {
         width: 100%;
+        max-width: 250px;
+        margin: 0 auto;
+        padding: 10px 14px;
+        font-size: 0.95rem;
+    }
+
+    .chart-container {
+        border-radius: 0;
+    }
+
+    .connection-status {
         justify-content: center;
-        margin-left: 0;
-        margin-top: 10px;
+        width: 100%;
+        padding: 8px 16px;
+    }
+
+    .fullscreen-toggle {
+        top: 8px;
+        right: 8px;
+        padding: 8px;
+    }
+}
+
+/* Large Mobile (600px-767px) */
+@media (max-width: 767px) and (min-width: 600px) {
+    .chart-controls {
+        padding: 12px 15px;
+        gap: 12px;
     }
     
-    .chart-container {
-        height: calc(100vh - 320px);
-        min-height: 350px;
-        max-height: 700px;
-    }
-}
-
-@media (max-width: 992px) {
-    .chart-container {
-        height: calc(100vh - 280px);
-        min-height: 400px;
-    }
-}
-
-@media (min-width: 1200px) {
-    .chart-section {
-        max-width: none;
-        margin: 20px 0;
+    .chart-controls select {
+        width: 100%;
+        padding: 8px 12px;
+        font-size: 0.9rem;
     }
     
-    .chart-container {
-        height: calc(100vh - 250px);
-        min-height: 500px;
-        max-height: 900px;
+    .connection-status {
+        font-size: 0.85rem;
+        padding: 6px 12px;
+    }
+    
+    .fullscreen-toggle {
+        padding: 6px;
+        top: 6px;
+        right: 6px;
+    }
+    
+    .fullscreen-toggle svg {
+        width: 18px;
+        height: 18px;
     }
 }
 
-.fullscreen-toggle {
-    position: absolute;
-    right: 15px;
-    bottom: 50px;
-    background: rgba(15, 23, 42, 0.85);
-    backdrop-filter: blur(5px);
-    -webkit-backdrop-filter: blur(5px);
-    color: white;
-    border: 1px solid rgba(63, 169, 245, 0.3);
-    border-radius: 6px;
-    padding: 8px 12px;
-    font-size: 0.85rem;
-    cursor: pointer;
-    z-index: 100;
-    transition: all 0.2s ease;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+/* Medium Mobile (480px-599px) */
+@media (max-width: 599px) and (min-width: 480px) {
+    .chart-controls {
+        padding: 10px 12px;
+        gap: 10px;
+    }
+    
+    .chart-controls select {
+        padding: 6px 10px;
+        font-size: 0.85rem;
+    }
+    
+    .connection-status {
+        font-size: 0.8rem;
+        padding: 5px 10px;
+    }
+    
+    .fullscreen-toggle {
+        padding: 5px;
+        top: 5px;
+        right: 5px;
+    }
+    
+    .fullscreen-toggle svg {
+        width: 16px;
+        height: 16px;
+    }
 }
 
-.fullscreen-toggle:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 6px 15px rgba(0, 0, 0, 0.4);
-    border-color: rgba(63, 169, 245, 0.5);
+/* Small Mobile (≤479px) */
+@media (max-width: 479px) {
+    .chart-controls {
+        padding: 8px 10px;
+        gap: 8px;
+    }
+    
+    .chart-controls label {
+        font-size: 0.8rem;
+    }
+    
+    .chart-controls select {
+        padding: 5px 8px;
+        font-size: 0.8rem;
+    }
+    
+    .connection-status {
+        font-size: 0.75rem;
+        padding: 4px 8px;
+    }
+    
+    .connection-status span {
+        display: none; /* Hide text on very small screens */
+    }
+    
+    .status-icon {
+        margin: 0 auto;
+    }
+    
+    .fullscreen-toggle {
+        padding: 4px;
+        top: 4px;
+        right: 4px;
+    }
+    
+    .fullscreen-toggle svg {
+        width: 14px;
+        height: 14px;
+    }
 }
 
-/* Fullscreen mode adjustments */
-.chart-container:fullscreen {
-    padding: 20px;
-    background-color: #000;
+/* Enhanced fullscreen responsive behavior */
+@media (max-width: 768px) {
+    .chart-container.fullscreen .chart-controls,
+    .chart-container:fullscreen .chart-controls,
+    .chart-container:-webkit-full-screen .chart-controls,
+    .chart-container:-moz-full-screen .chart-controls,
+    .chart-container:-ms-fullscreen .chart-controls {
+        padding: 10px 15px !important;
+        background: rgba(55, 65, 81, 0.98) !important;
+    }
+    
+    .chart-container.fullscreen .fullscreen-toggle,
+    .chart-container:fullscreen .fullscreen-toggle,
+    .chart-container:-webkit-full-screen .fullscreen-toggle,
+    .chart-container:-moz-full-screen .fullscreen-toggle,
+    .chart-container:-ms-fullscreen .fullscreen-toggle {
+        top: 15px !important;
+        right: 15px !important;
+        padding: 8px !important;
+    }
 }
 
-.chart-container:fullscreen .fullscreen-toggle {
-    position: fixed;
-    right: 20px;
-    bottom: 20px;
+/* Ensure chart content scales properly */
+.tv-lightweight-charts {
+    width: 100% !important;
+    height: 100% !important;
 }
 
-.chart-container:fullscreen .diagnostic-toggle {
-    position: fixed;
-    right: 20px;
-    bottom: 70px;
+.tv-lightweight-charts canvas {
+    width: 100% !important;
+    height: 100% !important;
+    max-width: none !important;
+    max-height: none !important;
 }
 
-/* Connection status styling */
-.connection-status {
+/* Chart placeholder error styling */
+.chart-placeholder-error {
     display: flex;
     align-items: center;
-    padding: 5px 10px;
-    border-radius: 4px;
-    margin-left: 10px;
+    justify-content: center;
+    padding: 40px;
+    text-align: center;
+    color: #ef4444;
+    background: rgba(239, 68, 68, 0.1);
+    border: 1px solid rgba(239, 68, 68, 0.3);
+    border-radius: 8px;
+    margin: 20px;
+    font-size: 1rem;
     font-weight: 500;
-    font-size: 14px;
-}
-
-.connection-status .status-icon {
-    width: 10px;
-    height: 10px;
-    border-radius: 50%;
-    margin-right: 8px;
-}
-
-.connection-status.connected {
-    background-color: rgba(38, 166, 154, 0.1);
-    color: #26a69a;
-}
-
-.connection-status.connected .status-icon {
-    background-color: #26a69a;
-    box-shadow: 0 0 5px #26a69a;
-}
-
-.connection-status.disconnected {
-    background-color: rgba(239, 83, 80, 0.1);
-    color: #ef5350;
-}
-
-.connection-status.disconnected .status-icon {
-    background-color: #ef5350;
-    box-shadow: 0 0 5px #ef5350;
-}
-
-/* Chart status bar */
-.chart-status-bar {
-    display: flex;
-    align-items: center;
-    background-color: rgba(30, 34, 45, 0.8);
-    padding: 6px 12px;
-    border-top: 1px solid rgba(255, 255, 255, 0.1);
-    color: #d1d4dc;
-    font-size: 12px;
-    gap: 15px;
-}
-
-.chart-status-item {
-    display: flex;
-    align-items: center;
-}
-
-.status-label {
-    color: #787b86;
-    margin-right: 5px;
-}
-
-.status-value {
-    font-weight: 500;
-}
-
-.status-ok {
-    color: #26a69a;
-}
-
-.status-error {
-    color: #ef5350;
-}
-
-.status-warning {
-    color: #ff9800;
-}
-
-/* Style for diagnostics panel */
-.diagnostics-panel {
-    position: absolute;
-    bottom: 50px;
-    right: 10px;
-    background-color: rgba(30, 34, 45, 0.9);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: 4px;
-    padding: 10px;
-    max-width: 400px;
-    max-height: 300px;
-    overflow-y: auto;
-    color: #d1d4dc;
-    font-size: 12px;
-    font-family: monospace;
-    z-index: 100;
-}
-
-.diagnostics-panel h4 {
-    margin-top: 5px;
-    margin-bottom: 5px;
-    color: #787b86;
-    font-size: 13px;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-    padding-bottom: 3px;
-}
-
-.diagnostics-panel ul {
-    list-style-type: none;
-    padding-left: 5px;
-    margin-top: 5px;
-}
-
-.diagnostics-panel ul li {
-    margin-bottom: 3px;
-}
-
-.diagnostics-panel .error-entry {
-    color: #ef5350;
-}
-
-/* Style for diagnostics button */
-.diagnostics-toggle {
-    position: absolute;
-    bottom: 10px;
-    right: 10px;
-    background-color: rgba(30, 34, 45, 0.7);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: 4px;
-    padding: 5px 10px;
-    color: #d1d4dc;
-    font-size: 12px;
-    cursor: pointer;
-    z-index: 100;
-}
-
-.diagnostics-toggle:hover {
-    background-color: rgba(30, 34, 45, 0.9);
-}
-
-/* Live update indicator styling */
-.live-indicator {
-    display: inline-flex;
-    align-items: center;
-    margin-left: 10px;
-}
-
-.pulse {
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    background-color: #666;
-    position: relative;
-}
-
-.pulse.active {
-    background-color: #4caf50;
-    box-shadow: 0 0 0 0 rgba(76, 175, 80, 1);
-    animation: pulse-animation 1s infinite;
-}
-
-@keyframes pulse-animation {
-    0% {
-        box-shadow: 0 0 0 0 rgba(76, 175, 80, 0.7);
-    }
-    70% {
-        box-shadow: 0 0 0 6px rgba(76, 175, 80, 0);
-    }
-    100% {
-        box-shadow: 0 0 0 0 rgba(76, 175, 80, 0);
-    }
-}
-
-/* Status bar enhancements */
-.chart-status-bar {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 12px;
-    padding: 4px 10px;
-    background-color: rgba(0, 0, 0, 0.6);
-    border-radius: 4px;
-    margin-top: 6px;
-    font-size: 0.85rem;
-}
-
-.chart-status-item {
-    display: flex;
-    align-items: center;
-}
-
-.status-label {
-    font-weight: bold;
-    margin-right: 4px;
-    color: #ccc;
-}
-
-.status-value {
-    color: white;
-}
-
-.status-ok {
-    color: #4caf50;
-}
-
-.status-error {
-    color: #ef5350;
-}
-
-.status-warn {
-    color: #ffc107;
-}
-
-/* Diagnostic panel enhancements */
-.diagnostic-panel {
-    position: absolute;
-    top: 10px;
-    right: 10px;
-    background-color: rgba(0, 0, 0, 0.8);
-    border: 1px solid #3f3f3f;
-    border-radius: 4px;
-    padding: 10px;
-    z-index: 10;
-    color: white;
-    font-size: 12px;
-    max-width: 300px;
-    max-height: 80vh;
-    overflow-y: auto;
-}
-
-.diagnostic-panel h3 {
-    margin-top: 0;
-    display: flex;
-    justify-content: space-between;
-    font-size: 14px;
-}
-
-.diagnostic-panel ul {
-    margin: 0;
-    padding-left: 20px;
-}
-
-.diagnostic-panel li {
-    margin-bottom: 5px;
-}
-
-.diagnostic-panel .button-group {
-    display: flex;
-    gap: 8px;
-    margin-top: 10px;
-}
-
-.diagnostic-panel button {
-    background-color: #2a2a2a;
-    border: 1px solid #3f3f3f;
-    color: white;
-    padding: 4px 8px;
-    border-radius: 4px;
-    cursor: pointer;
-    font-size: 12px;
-}
-
-.diagnostic-panel button:hover {
-    background-color: #3a3a3a;
 }

@@ -106,87 +106,92 @@ const TradeHistory = () => {
       <h2>Trade History</h2>
       {trades.length === 0 ? (
         <div className="no-trades">
-          <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M22 12h-4l-3 9L9 3l-3 9H2"></path>
           </svg>
           <p>No trades found in your history</p>
         </div>
       ) : (
-        <div className="trades-table-container">
-          <table className="trades-table">
-            <thead>
-              <tr>
-                <th>ID</th>
-                <th>DATE & TIME</th>
-                <th>SYMBOL</th>
-                <th>TYPE</th>
-                <th>VOLUME</th>
-                <th>PRICE</th>
-                <th>S / L</th>
-                <th>T / P</th>
-                <th>TIME</th>
-                <th>PRICE</th>
-                <th>PROFIT</th>
-                <th>CHANGE</th>
-              </tr>
-            </thead>
-            <tbody>
-              {trades.map((trade) => (
-                <tr key={trade.id || trade.ticket} className={`${trade.profit >= 0 ? 'profit-row' : 'loss-row'} ${trade.is_open ? 'open-position' : 'closed-position'}`}>
-                  <td>{trade.id || trade.ticket}</td>
-                  <td>{formatDate(trade.timestamp || trade.time)}</td>
-                  <td className="symbol-cell">
-                    {trade.symbol}
-                    {trade.is_open && <span className="open-badge">OPEN</span>}
-                  </td>
-                  <td className={trade.type === 'BUY' ? 'buy-type' : 'sell-type'}>
-                    {trade.type}
-                  </td>
-                  <td>{formatVolume(trade.volume)}</td>
-                  <td>{formatCurrency(trade.price || trade.entry_price)}</td>
-                  <td>{trade.sl && trade.sl > 0 ? formatCurrency(trade.sl) : '—'}</td>
-                  <td>{trade.tp && trade.tp > 0 ? formatCurrency(trade.tp) : '—'}</td>
-                  <td>
-                    {trade.close_time ? formatDate(trade.close_time) : 
-                     trade.is_open ? 'Open' : formatDate(trade.timestamp || trade.time)}
-                  </td>
-                  <td>{formatCurrency(trade.exit_price || trade.current_price || trade.price || trade.entry_price)}</td>
-                  <td className={trade.profit >= 0 ? 'profit' : 'loss'}>
-                    {formatCurrency(trade.profit)}
-                  </td>
-                  <td className={trade.change_percent >= 0 ? 'profit' : 'loss'}>
-                    {formatChangePercent(trade.change_percent)}
-                  </td>
+        <div className="trades-content">
+          {/* Responsive table container */}
+          <div className="trades-table-container">
+            <table className="trades-table">
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>Date & Time</th>
+                  <th>Symbol</th>
+                  <th>Type</th>
+                  <th>Volume</th>
+                  <th>Price</th>
+                  <th className="hidden-mobile">S / L</th>
+                  <th className="hidden-mobile">T / P</th>
+                  <th className="hidden-tablet">Time</th>
+                  <th className="hidden-tablet">Price</th>
+                  <th>Profit</th>
+                  <th className="hidden-mobile">Change</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {trades.map((trade) => (
+                  <tr key={trade.id || trade.ticket} className={`${trade.profit >= 0 ? 'profit-row' : 'loss-row'} ${trade.is_open ? 'open-position' : 'closed-position'}`}>
+                    <td>{trade.id || trade.ticket}</td>
+                    <td>{formatDate(trade.timestamp || trade.time)}</td>
+                    <td className="symbol-cell">
+                      <span className="symbol">{trade.symbol}</span>
+                      {trade.is_open && <span className="open-badge">OPEN</span>}
+                    </td>
+                    <td>
+                      <span className={`type-badge ${trade.type === 'BUY' ? 'buy-type' : 'sell-type'}`}>
+                        {trade.type}
+                      </span>
+                    </td>
+                    <td>{formatVolume(trade.volume)}</td>
+                    <td>{formatCurrency(trade.price || trade.entry_price)}</td>
+                    <td className="hidden-mobile">{trade.sl && trade.sl > 0 ? formatCurrency(trade.sl) : '—'}</td>
+                    <td className="hidden-mobile">{trade.tp && trade.tp > 0 ? formatCurrency(trade.tp) : '—'}</td>
+                    <td className="hidden-tablet">
+                      {trade.close_time ? formatDate(trade.close_time) : 
+                       trade.is_open ? 'Open' : formatDate(trade.timestamp || trade.time)}
+                    </td>
+                    <td className="hidden-tablet">{formatCurrency(trade.exit_price || trade.current_price || trade.price || trade.entry_price)}</td>
+                    <td className={`profit-cell ${trade.profit >= 0 ? 'profit' : 'loss'}`}>
+                      {formatCurrency(trade.profit)}
+                    </td>
+                    <td className={`change-cell hidden-mobile ${trade.change_percent >= 0 ? 'profit' : 'loss'}`}>
+                      {formatChangePercent(trade.change_percent)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
           
-          {/* Additional Trade Details Section */}
+          {/* Trade Summary Section */}
           <div className="trade-details-summary">
             <h3>Trade Summary</h3>
             <div className="summary-grid">
               <div className="summary-item">
-                <span className="label">Total Trades:</span>
+                <span className="label">Total Trades</span>
                 <span className="value">{trades.length}</span>
               </div>
               <div className="summary-item">
-                <span className="label">Profitable Trades:</span>
+                <span className="label">Profitable</span>
                 <span className="value profit">{trades.filter(t => (t.profit || 0) > 0).length}</span>
               </div>
               <div className="summary-item">
-                <span className="label">Losing Trades:</span>
+                <span className="label">Losing</span>
                 <span className="value loss">{trades.filter(t => (t.profit || 0) < 0).length}</span>
               </div>
               <div className="summary-item">
-                <span className="label">Total Profit/Loss:</span>
+                <span className="label">Total P/L</span>
                 <span className={`value ${trades.reduce((sum, t) => sum + (t.profit || 0), 0) >= 0 ? 'profit' : 'loss'}`}>
                   {formatCurrency(trades.reduce((sum, t) => sum + (t.profit || 0), 0))}
                 </span>
               </div>
               {trades.some(t => t.commission) && (
                 <div className="summary-item">
-                  <span className="label">Total Commission:</span>
+                  <span className="label">Commission</span>
                   <span className="value">
                     {formatCurrency(trades.reduce((sum, t) => sum + (t.commission || 0), 0))}
                   </span>
@@ -194,7 +199,7 @@ const TradeHistory = () => {
               )}
               {trades.some(t => t.swap) && (
                 <div className="summary-item">
-                  <span className="label">Total Swap:</span>
+                  <span className="label">Swap</span>
                   <span className="value">
                     {formatCurrency(trades.reduce((sum, t) => sum + (t.swap || 0), 0))}
                   </span>

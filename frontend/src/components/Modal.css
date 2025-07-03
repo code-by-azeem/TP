@@ -14,14 +14,14 @@
 }
 
 .modal-container {
-  background: rgba(14, 22, 39, 0.95);
+  background: rgba(31, 41, 55, 0.95);
   width: 400px;
   max-width: 90%;
   border-radius: 12px;
   overflow: hidden;
   box-shadow: 0 15px 25px rgba(0, 0, 0, 0.5);
   animation: slideIn 0.3s ease-out;
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(82, 196, 26, 0.2);
 }
 
 .modal-header {
@@ -29,7 +29,7 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  border-bottom: 1px solid rgba(82, 196, 26, 0.2);
 }
 
 .modal-header h3 {
@@ -40,18 +40,18 @@
 }
 
 .modal-header.success {
-  background: linear-gradient(90deg, #0a2e36 0%, #0a4331 100%);
-  border-left: 4px solid #26A69A;
+  background: linear-gradient(90deg, rgba(31, 41, 55, 0.8) 0%, rgba(55, 65, 81, 0.8) 100%);
+  border-left: 4px solid #52c41a;
 }
 
 .modal-header.error {
-  background: linear-gradient(90deg, #3e1a1a 0%, #461a28 100%);
-  border-left: 4px solid #EF5350;
+  background: linear-gradient(90deg, rgba(31, 41, 55, 0.8) 0%, rgba(55, 65, 81, 0.8) 100%);
+  border-left: 4px solid #ef4444;
 }
 
 .modal-header.info {
-  background: linear-gradient(90deg, #1a2c3e 0%, #1a2346 100%);
-  border-left: 4px solid #3FA9F5;
+  background: linear-gradient(90deg, rgba(31, 41, 55, 0.8) 0%, rgba(55, 65, 81, 0.8) 100%);
+  border-left: 4px solid #52c41a;
 }
 
 .modal-body {
@@ -64,7 +64,7 @@
   padding: 15px 20px;
   display: flex;
   justify-content: flex-end;
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  border-top: 1px solid rgba(82, 196, 26, 0.2);
 }
 
 .modal-button, .modal-action-button {
@@ -79,22 +79,24 @@
 }
 
 .modal-button {
-  background: #2d3748;
+  background: #374151;
   color: white;
+  border: 1px solid rgba(82, 196, 26, 0.3);
 }
 
 .modal-button:hover {
-  background: #3a4a5f;
+  background: #4b5563;
+  border-color: rgba(82, 196, 26, 0.5);
 }
 
 .modal-action-button {
-  background: #3FA9F5;
+  background: #52c41a;
   color: white;
   margin-left: 10px;
 }
 
 .modal-action-button:hover {
-  background: #288ad6;
+  background: #45a517;
 }
 
 .modal-close {
@@ -115,7 +117,7 @@
 }
 
 .modal-close:hover {
-  color: white;
+  color: #52c41a;
 }
 
 @keyframes fadeIn {

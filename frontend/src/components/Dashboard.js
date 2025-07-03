@@ -14,7 +14,6 @@ const Dashboard = () => {
     balance: 0,
     equity: 0,
     margin: 0,
-    freeMargin: 0,
     profit: 0
   });
   const [isLoading, setIsLoading] = useState(true);
@@ -37,7 +36,6 @@ const Dashboard = () => {
           balance: data.balance || 0,
           equity: data.equity || 0,
           margin: data.margin || 0,
-          freeMargin: data.margin_free || data.freeMargin || 0,
           profit: data.profit || 0,
           marginLevel: data.margin_level || data.marginLevel || 0,
           currency: data.currency || 'USD',
@@ -152,75 +150,102 @@ const Dashboard = () => {
   
   return (
     <div className="dashboard-container">
-      <div className="dashboard-header">
-        <div className="brand">
-          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <polyline points="22 8 22 2 16 2"></polyline>
-            <path d="M22 2L12 12"></path>
-            <path d="M8 16l-6 6"></path>
-            <path d="M19 21c1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3 1.34 3 3 3z"></path>
-            <path d="M3 8a5 5 0 0 1 5-5"></path>
-            <path d="M15 3a5 5 0 0 1 5 5"></path>
-          </svg>
-          <h1>TradePulse</h1>
-        </div>
+      {/* Header/Navbar */}
+      <header className="dashboard-header">
+        <div className="header-content">
+          {/* Brand */}
+          <div className="brand">
+            <img 
+              src="/Logo.png" 
+              alt="TradePulse Logo" 
+              className="brand-logo"
+              onError={(e) => {
+                e.target.style.display = 'none';
+                e.target.nextSibling.style.display = 'block';
+              }}
+            />
+            <svg 
+              xmlns="http://www.w3.org/2000/svg" 
+              width="32" 
+              height="32" 
+              viewBox="0 0 24 24" 
+              fill="none" 
+              stroke="currentColor" 
+              strokeWidth="2" 
+              strokeLinecap="round" 
+              strokeLinejoin="round"
+              className="brand-logo-fallback"
+              style={{display: 'none'}}
+            >
+              <polyline points="22 8 22 2 16 2"></polyline>
+              <path d="M22 2L12 12"></path>
+              <path d="M8 16l-6 6"></path>
+              <path d="M19 21c1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3 1.34 3 3 3z"></path>
+              <path d="M3 8a5 5 0 0 1 5-5"></path>
+              <path d="M15 3a5 5 0 0 1 5 5"></path>
+            </svg>
+            <h1>TradePulse</h1>
+          </div>
 
-        <div className="tab-navigation">
-          <button 
-            className={`tab-button ${activeTab === 'chart' ? 'active' : ''}`} 
-            onClick={() => switchTab('chart')}
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
-            </svg>
-            <span>Chart</span>
-          </button>
-          <button 
-            className={`tab-button ${activeTab === 'account' ? 'active' : ''}`} 
-            onClick={() => switchTab('account')}
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
-              <line x1="8" y1="21" x2="16" y2="21"></line>
-              <line x1="12" y1="17" x2="12" y2="21"></line>
-            </svg>
-            <span>Account Info</span>
-          </button>
-          <button 
-            className={`tab-button ${activeTab === 'history' ? 'active' : ''}`} 
-            onClick={() => switchTab('history')}
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="12" cy="12" r="10"></circle>
-              <polyline points="12 6 12 12 16 14"></polyline>
-            </svg>
-            <span>Trade History</span>
-          </button>
-          <button 
-            className={`tab-button ${activeTab === 'bot' ? 'active' : ''}`} 
-            onClick={() => switchTab('bot')}
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M12 3a6 6 0 0 0-6 6v1a1 1 0 0 0 1 1h2a1 1 0 0 0 1-1V9a2 2 0 1 1 4 0v1a1 1 0 0 0 1 1h2a1 1 0 0 0 1-1V9a6 6 0 0 0-6-6z"></path>
-              <path d="M9 12v6a3 3 0 0 0 6 0v-6"></path>
-            </svg>
-            <span>Trading Bot</span>
-          </button>
+          {/* Tab Navigation */}
+          <nav className="tab-navigation">
+            <button 
+              className={`tab-button ${activeTab === 'chart' ? 'active' : ''}`} 
+              onClick={() => switchTab('chart')}
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+              </svg>
+              <span>Chart</span>
+            </button>
+            <button 
+              className={`tab-button ${activeTab === 'account' ? 'active' : ''}`} 
+              onClick={() => switchTab('account')}
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
+                <line x1="8" y1="21" x2="16" y2="21"></line>
+                <line x1="12" y1="17" x2="12" y2="21"></line>
+              </svg>
+              <span>Account Info</span>
+            </button>
+            <button 
+              className={`tab-button ${activeTab === 'history' ? 'active' : ''}`} 
+              onClick={() => switchTab('history')}
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="10"></circle>
+                <polyline points="12 6 12 12 16 14"></polyline>
+              </svg>
+              <span>Trade History</span>
+            </button>
+            <button 
+              className={`tab-button ${activeTab === 'bot' ? 'active' : ''}`} 
+              onClick={() => switchTab('bot')}
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 3a6 6 0 0 0-6 6v1a1 1 0 0 0 1 1h2a1 1 0 0 0 1-1V9a2 2 0 1 1 4 0v1a1 1 0 0 0 1 1h2a1 1 0 0 0 1-1V9a6 6 0 0 0-6-6z"></path>
+                <path d="M9 12v6a3 3 0 0 0 6 0v-6"></path>
+              </svg>
+              <span>Trading Bot</span>
+            </button>
+          </nav>
+          
+          {/* User Info */}
+          <div className="dashboard-user-info">
+            <span className="username">{username}</span>
+            <button className="logout-button" onClick={handleLogout}>
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                <path fillRule="evenodd" d="M10 12.5a.5.5 0 0 1-.5.5h-8a.5.5 0 0 1-.5-.5v-9a.5.5 0 0 1 .5-.5h8a.5.5 0 0 1 .5.5v2a.5.5 0 0 0 1 0v-2A1.5 1.5 0 0 0 9.5 2h-8A1.5 1.5 0 0 0 0 3.5v9A1.5 1.5 0 0 0 1.5 14h8a1.5 1.5 0 0 0 1.5-1.5v-2a.5.5 0 0 0-1 0v2z"/>
+                <path fillRule="evenodd" d="M15.854 8.354a.5.5 0 0 0 0-.708l-3-3a.5.5 0 0 0-.708.708L14.293 7.5H5.5a.5.5 0 0 0 0 1h8.793l-2.147 2.146a.5.5 0 0 0 .708.708l3-3z"/>
+              </svg>
+              <span>Logout</span>
+            </button>
+          </div>
         </div>
-        
-        <div className="dashboard-user-info">
-          <span className="username">{username}</span>
-          <button className="logout-button" onClick={handleLogout}>
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
-              <path fillRule="evenodd" d="M10 12.5a.5.5 0 0 1-.5.5h-8a.5.5 0 0 1-.5-.5v-9a.5.5 0 0 1 .5-.5h8a.5.5 0 0 1 .5.5v2a.5.5 0 0 0 1 0v-2A1.5 1.5 0 0 0 9.5 2h-8A1.5 1.5 0 0 0 0 3.5v9A1.5 1.5 0 0 0 1.5 14h8a1.5 1.5 0 0 0 1.5-1.5v-2a.5.5 0 0 0-1 0v2z"/>
-              <path fillRule="evenodd" d="M15.854 8.354a.5.5 0 0 0 0-.708l-3-3a.5.5 0 0 0-.708.708L14.293 7.5H5.5a.5.5 0 0 0 0 1h8.793l-2.147 2.146a.5.5 0 0 0 .708.708l3-3z"/>
-            </svg>
-            Logout
-          </button>
-        </div>
-      </div>
+      </header>
       
-      {/* Info Panels - only show on chart view */}
+      {/* Stats Panel - only show on chart view */}
       {activeTab === 'chart' && (
         <div className="dashboard-info-panels">
           <div className="info-panel">
@@ -242,10 +267,12 @@ const Dashboard = () => {
         </div>
       )}
       
-      {/* Tab Content */}
-      <div className="tab-content">
-        {renderTabContent()}
-      </div>
+      {/* Main Content */}
+      <main className="main-content">
+        <div className="tab-content">
+          {renderTabContent()}
+        </div>
+      </main>
     </div>
   );
 };

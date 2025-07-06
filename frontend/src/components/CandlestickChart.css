@@ -603,12 +603,14 @@
 .chart-container {
     position: relative;
     width: 100%;
-    height: calc(100vh - 280px);
-    min-height: 500px;
+    height: 100%;
+    min-height: 400px;
     background: linear-gradient(135deg, #1f2937 0%, #111827 100%);
     border-radius: 0 0 12px 12px;
     overflow: hidden;
     flex: 1;
+    padding-bottom: 5px; /* Ensure space for time axis */
+    box-sizing: border-box;
 }
 
 /* Fullscreen toggle button */
@@ -1117,10 +1119,6 @@ div[class*="crosshair"] div:not(:first-child) {
 
 /* Responsive Design - Tablet */
 @media (max-width: 1024px) {
-    .chart-section {
-        height: calc(100vh - 160px);
-    }
-    
     .controls {
         padding: 15px 20px;
         gap: 12px;
@@ -1139,10 +1137,6 @@ div[class*="crosshair"] div:not(:first-child) {
 
 /* Responsive Design - Mobile Large */
 @media (max-width: 768px) {
-    .chart-section {
-        height: calc(100vh - 140px);
-    }
-    
     .controls {
         flex-direction: column;
         align-items: flex-start;
@@ -1183,10 +1177,6 @@ div[class*="crosshair"] div:not(:first-child) {
 
 /* Responsive Design - Mobile Small */
 @media (max-width: 640px) {
-    .chart-section {
-        height: calc(100vh - 120px);
-    }
-    
     .controls {
         padding: 10px 12px;
         gap: 10px;
@@ -1215,10 +1205,6 @@ div[class*="crosshair"] div:not(:first-child) {
 
 /* Responsive Design - Mobile Extra Small */
 @media (max-width: 480px) {
-    .chart-section {
-        height: calc(100vh - 100px);
-    }
-    
     .controls {
         padding: 8px 10px;
         gap: 8px;
@@ -1266,7 +1252,18 @@ div[class*="crosshair"] div:not(:first-child) {
 /* Ensure chart canvas uses full dimensions */
 .chart-container canvas {
     width: 100% !important;
-    height: 100% !important;
+    height: calc(100% - 5px) !important; /* Leave space for time axis */
+}
+
+/* Ensure time axis is always visible */
+@media (max-width: 1024px) and (min-width: 600px) {
+    .chart-container {
+        padding-bottom: 8px; /* Extra space for time axis on problematic range */
+    }
+    
+    .chart-container canvas {
+        height: calc(100% - 8px) !important;
+    }
 }
 
 /* Force full screen usage for all chart elements */

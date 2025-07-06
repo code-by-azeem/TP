@@ -296,7 +296,8 @@
   }
   
   .tab-content .chart-container {
-    height: calc(100vh - 180px) !important;
+    height: calc(100vh - 90px) !important;
+    min-height: 400px;
   }
 }
 
@@ -362,7 +363,8 @@
   }
 
   .tab-content .chart-container {
-    min-height: calc(100vh - 200px);
+    height: calc(100vh - 120px) !important;
+    min-height: 350px;
   }
 }
 
@@ -402,7 +404,8 @@
   }
 
   .tab-content .chart-container {
-    min-height: calc(100vh - 180px);
+    height: calc(100vh - 140px) !important;
+    min-height: 300px;
   }
 
   .info-panel .value {
@@ -462,45 +465,58 @@
 }
 
 /* Critical responsive breakpoint for 700px-800px range */
-@media (max-width: 800px) {
+@media (max-width: 800px) and (min-width: 768px) {
   .header-content {
-    padding: 12px 20px;
+    flex-direction: column;
+    align-items: stretch;
     gap: 15px;
+    padding: 15px 20px;
+    min-height: auto;
   }
   
   .tab-navigation {
-    gap: 6px;
-    max-width: 450px;
+    justify-content: center;
+    order: 2;
+    gap: 8px;
+    flex-wrap: wrap;
+    max-width: none;
+  }
+  
+  .dashboard-user-info {
+    order: 3;
+    justify-content: center;
+    gap: 15px;
   }
   
   .tab-button {
-    padding: 10px 16px;
+    padding: 12px 18px;
     font-size: 0.85rem;
-    min-height: 40px;
+    min-height: 42px;
   }
   
   .tab-button span {
-    display: none; /* Hide text, keep only icons */
+    display: inline;
   }
   
   .username {
     font-size: 0.85rem;
-    padding: 6px 12px;
-    padding-left: 28px;
+    padding: 8px 14px;
+    padding-left: 30px;
   }
   
   .logout-button {
-    padding: 8px 12px;
+    padding: 10px 14px;
     font-size: 0.85rem;
-    min-height: 40px;
-  }
-  
-  .logout-button span {
-    display: none; /* Hide text, keep only icon */
+    min-height: 42px;
   }
   
   .brand h1 {
-    font-size: 1.6rem;
+    font-size: 1.7rem;
+  }
+  
+  .tab-content .chart-container {
+    height: calc(100vh - 175px) !important;
+    min-height: 390px;
   }
 }
 
@@ -553,10 +569,125 @@
   .tab-navigation {
     max-width: 650px;
   }
+  
+  .username {
+    font-size: 1rem;
+    padding: 12px 18px;
+    padding-left: 36px;
+  }
+
+  .logout-button {
+    padding: 14px 20px;
+    font-size: 1rem;
+    min-height: 50px;
+  }
+  
+  .tab-content .chart-container {
+    height: calc(100vh - 95px) !important;
+    min-height: 500px;
+  }
 }
 
-/* Small Desktop/Large Tablet (1024px-1199px) */
-@media (max-width: 1199px) and (min-width: 1024px) {
+/* Desktop Transition (1030px-1150px) */
+@media (max-width: 1150px) and (min-width: 1030px) {
+  .dashboard-info-panels {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 22px;
+    padding: 25px;
+  }
+  
+  .header-content {
+    padding: 15px 24px;
+  }
+  
+  .brand h1 {
+    font-size: 1.9rem;
+  }
+  
+  .tab-navigation {
+    gap: 10px;
+    max-width: 580px;
+  }
+  
+  .tab-button {
+    padding: 12px 18px;
+    font-size: 0.9rem;
+    min-height: 46px;
+  }
+  
+  .username {
+    font-size: 0.9rem;
+    padding: 10px 16px;
+    padding-left: 32px;
+  }
+
+  .logout-button {
+    padding: 12px 16px;
+    font-size: 0.9rem;
+    min-height: 46px;
+  }
+  
+  .info-panel .value {
+    font-size: 1.5rem;
+  }
+  
+  .tab-content .chart-container {
+    height: calc(100vh - 105px) !important;
+    min-height: 430px;
+  }
+}
+
+/* Desktop Mid-Range (1151px-1199px) */
+@media (max-width: 1199px) and (min-width: 1151px) {
+  .dashboard-info-panels {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 24px;
+    padding: 28px;
+  }
+  
+  .header-content {
+    padding: 16px 26px;
+  }
+  
+  .brand h1 {
+    font-size: 2.1rem;
+  }
+  
+  .tab-navigation {
+    gap: 12px;
+    max-width: 620px;
+  }
+  
+  .tab-button {
+    padding: 13px 19px;
+    font-size: 0.95rem;
+    min-height: 47px;
+  }
+  
+  .username {
+    font-size: 0.95rem;
+    padding: 11px 17px;
+    padding-left: 35px;
+  }
+
+  .logout-button {
+    padding: 13px 19px;
+    font-size: 0.95rem;
+    min-height: 47px;
+  }
+  
+  .info-panel .value {
+    font-size: 1.7rem;
+  }
+  
+  .tab-content .chart-container {
+    height: calc(100vh - 98px) !important;
+    min-height: 470px;
+  }
+}
+
+/* Small Desktop/Large Tablet (1024px-1029px) */
+@media (max-width: 1029px) and (min-width: 1024px) {
   .dashboard-info-panels {
     grid-template-columns: repeat(2, 1fr);
     gap: 20px;
@@ -571,8 +702,31 @@
     font-size: 2rem;
   }
   
+  .tab-button {
+    padding: 12px 18px;
+    font-size: 0.9rem;
+    min-height: 44px;
+  }
+  
   .info-panel .value {
     font-size: 1.6rem;
+  }
+  
+  .username {
+    font-size: 0.95rem;
+    padding: 10px 16px;
+    padding-left: 34px;
+  }
+
+  .logout-button {
+    padding: 12px 18px;
+    font-size: 0.95rem;
+    min-height: 48px;
+  }
+  
+  .tab-content .chart-container {
+    height: calc(100vh - 100px) !important;
+    min-height: 450px;
   }
 }
 
@@ -639,10 +793,55 @@
     font-size: 0.9rem;
     min-height: 44px;
   }
+  
+  .tab-content .chart-container {
+    height: calc(100vh - 180px) !important;
+    min-height: 400px;
+  }
 }
 
-/* Large Mobile (600px-767px) */
-@media (max-width: 767px) and (min-width: 600px) {
+/* Tablet to Mobile Transition (750px-767px) */
+@media (max-width: 767px) and (min-width: 750px) {
+  .header-content {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+    padding: 12px 20px;
+    min-height: auto;
+  }
+
+  .tab-navigation {
+    justify-content: center;
+    order: 2;
+    gap: 8px;
+    flex-wrap: wrap;
+    max-width: none;
+  }
+
+  .dashboard-user-info {
+    order: 3;
+    justify-content: center;
+    gap: 12px;
+  }
+
+  .tab-button {
+    padding: 10px 16px;
+    font-size: 0.85rem;
+    min-height: 42px;
+  }
+
+  .tab-button span {
+    display: inline;
+  }
+  
+  .tab-content .chart-container {
+    height: calc(100vh - 170px) !important;
+    min-height: 380px;
+  }
+}
+
+/* Large Mobile (600px-749px) */
+@media (max-width: 749px) and (min-width: 600px) {
   .header-content {
     padding: 12px 20px;
     gap: 15px;
@@ -695,6 +894,11 @@
   
   .info-panel .value {
     font-size: 1.3rem;
+  }
+  
+  .tab-content .chart-container {
+    height: calc(100vh - 130px) !important;
+    min-height: 350px;
   }
 }
 
@@ -750,6 +954,11 @@
     padding: 6px 12px;
     font-size: 0.8rem;
     min-height: 40px;
+  }
+  
+  .tab-content .chart-container {
+    height: calc(100vh - 120px) !important;
+    min-height: 300px;
   }
 }
 
@@ -824,6 +1033,11 @@
   .tab-button svg {
     width: 16px;
     height: 16px;
+  }
+  
+  .tab-content .chart-container {
+    height: calc(100vh - 110px) !important;
+    min-height: 280px;
   }
 }
 

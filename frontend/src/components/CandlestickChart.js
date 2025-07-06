@@ -808,7 +808,13 @@ function CandlestickChart() {
                     timeScale: { 
                         borderColor: 'rgba(197, 203, 206, 0.6)', 
                         timeVisible: true, 
-                        secondsVisible: true,
+                        secondsVisible: false,
+                        rightOffset: 12,
+                        barSpacing: 6,
+                        lockVisibleTimeRangeOnResize: true,
+                        rightBarStaysOnScroll: true,
+                        borderVisible: true,
+                        visible: true,
                     },
                 };
 
@@ -951,9 +957,26 @@ function CandlestickChart() {
                 // Set up window resize handler
                 const handleResize = () => { 
                     if (chartRef.current && chartContainerRef.current) {
+                        const rect = chartContainerRef.current.getBoundingClientRect();
+                        const width = Math.max(rect.width, 300);
+                        const height = Math.max(rect.height, 200);
+                        
                         chartRef.current.applyOptions({
-                            width: chartContainerRef.current.clientWidth > 0 ? 
-                                   chartContainerRef.current.clientWidth : 600
+                            width: width,
+                            height: height,
+                            timeScale: {
+                                timeVisible: true,
+                                secondsVisible: width > 600, // Show seconds only on larger screens
+                                rightOffset: width > 768 ? 12 : 8,
+                                barSpacing: width > 768 ? 6 : 4,
+                                borderVisible: true,
+                                visible: true,
+                                fixLeftEdge: false,
+                                fixRightEdge: false,
+                                lockVisibleTimeRangeOnResize: true,
+                                rightBarStaysOnScroll: true,
+                                borderColor: 'rgba(197, 203, 206, 0.6)',
+                            }
                         });
                     }
                 };
@@ -1042,10 +1065,23 @@ function CandlestickChart() {
         console.log(`Timeframe state changed to ${timeframe}, ref is ${timeframeRef.current}`);
         
         // Update timescale options if needed, e.g., secondsVisible
-        chartRef.current.timeScale().applyOptions({ 
-            // timeVisible: true, // Assuming this is default or set elsewhere
-            secondsVisible: (timeframe === '1m' || timeframe === '5m') // Show seconds for smaller timeframes
-        });
+                                const container = chartContainerRef.current;
+                        const rect = container ? container.getBoundingClientRect() : { width: 600 };
+                        const containerWidth = Math.max(rect.width, 300);
+                        
+                        chartRef.current.timeScale().applyOptions({ 
+                            timeVisible: true,
+                            secondsVisible: containerWidth > 600 && (timeframe === '1m' || timeframe === '5m'), // Show seconds for smaller timeframes only on larger screens
+                            rightOffset: containerWidth > 768 ? 12 : 8,
+                            barSpacing: containerWidth > 768 ? 6 : 4,
+                            borderVisible: true,
+                            visible: true,
+                            fixLeftEdge: false,
+                            fixRightEdge: false,
+                            lockVisibleTimeRangeOnResize: true,
+                            rightBarStaysOnScroll: true,
+                            borderColor: 'rgba(197, 203, 206, 0.6)',
+                        });
         
         if (timeframeRef.current !== timeframe) {
             console.log(`Timeframe changed from ${timeframeRef.current} to ${timeframe}. Fetching new historical data...`);
@@ -1066,10 +1102,14 @@ function CandlestickChart() {
                     // Force the chart to redraw and clear any cached data
                     if (chartRef.current) {
                         chartRef.current.timeScale().fitContent();
+                        const container = chartContainerRef.current;
+                        const rect = container ? container.getBoundingClientRect() : { width: 600 };
+                        const containerWidth = Math.max(rect.width, 300);
+                        
                         chartRef.current.applyOptions({
                             timeScale: {
-                                rightOffset: 5,
-                                barSpacing: 10,
+                                rightOffset: containerWidth > 768 ? 12 : 8,
+                                barSpacing: containerWidth > 768 ? 6 : 4,
                                 fixLeftEdge: true,
                                 lockVisibleTimeRangeOnResize: true,
                                 rightBarStaysOnScroll: true,
@@ -1077,7 +1117,7 @@ function CandlestickChart() {
                                 borderColor: 'rgba(197, 203, 206, 0.6)',
                                 visible: true,
                                 timeVisible: true,
-                                secondsVisible: (timeframe === '1m' || timeframe === '5m')
+                                secondsVisible: containerWidth > 600 && (timeframe === '1m' || timeframe === '5m')
                             }
                         });
                     }
@@ -1303,6 +1343,19 @@ function CandlestickChart() {
                 chartRef.current.applyOptions({
                     width: width,
                     height: height,
+                    timeScale: {
+                        timeVisible: true,
+                        secondsVisible: width > 600, // Show seconds only on larger screens
+                        rightOffset: width > 768 ? 12 : 8,
+                        barSpacing: width > 768 ? 6 : 4,
+                        borderVisible: true,
+                        visible: true,
+                        fixLeftEdge: false,
+                        fixRightEdge: false,
+                        lockVisibleTimeRangeOnResize: true,
+                        rightBarStaysOnScroll: true,
+                        borderColor: 'rgba(197, 203, 206, 0.6)',
+                    }
                 });
                 
                 // Fit content after resize

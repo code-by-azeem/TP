@@ -508,6 +508,618 @@ def background_price_updater():
             log.error(f"Unexpected error in background_price_updater: {e}", exc_info=True)
             socketio.sleep(1)  # Sleep briefly before retrying after an error
 
+# --- Real-time Trade Monitoring ---
+trade_monitor_thread = None
+last_known_positions = {}  # Track position states
+last_known_deals = set()   # Track processed deal IDs
+last_full_history_check = datetime.now() - timedelta(minutes=5)  # Track last full history check
+
+def background_trade_monitor():
+    """Monitor MT5 trades in real-time and emit updates via SocketIO with enhanced deal detection"""
+    global last_known_positions, last_known_deals, last_full_history_check
+    
+    log.info("Starting enhanced real-time trade monitor...")
+    
+    # Track the last time we checked for deals to reduce API calls
+    last_deal_check = datetime.now() - timedelta(minutes=1)
+    deal_check_cache = {}
+    
+    while True:
+        try:
+            # Check MT5 connection
+            if not is_mt5_connected():
+                socketio.sleep(5)  # Wait before retrying
+                continue
+            
+            current_time = datetime.now()
+            
+            # Get current positions
+            current_positions = mt5.positions_get()
+            if current_positions is None:
+                current_positions = []
+            
+            # Convert positions to dict for easier comparison
+            current_positions_dict = {}
+            for pos in current_positions:
+                ticket = getattr(pos, 'ticket', 0)
+                current_positions_dict[ticket] = pos
+            
+            # First run initialization
+            if not last_known_positions:
+                last_known_positions = current_positions_dict
+                log.info(f"Initialized trade monitor with {len(current_positions_dict)} open positions")
+                socketio.sleep(1)
+                continue
+            
+            # Enhanced deal monitoring - check for new deals every 500ms for immediate detection
+            if (current_time - last_deal_check).total_seconds() >= 0.5:
+                check_for_new_deals(current_time)
+                # Also check for very recent deals (last 2 minutes) for immediate detection
+                check_immediate_deals(current_time)
+                last_deal_check = current_time
+            
+            # Perform full history check every 30 seconds to catch any missed trades
+            if (current_time - last_full_history_check).total_seconds() >= 30:
+                check_full_recent_history(current_time)
+                last_full_history_check = current_time
+            
+            # Check for new or updated positions
+            for ticket, pos in current_positions_dict.items():
+                if ticket not in last_known_positions:
+                    # New position opened
+                    log.info(f"New position opened: {ticket}")
+                    trade_data = format_position_data(pos, is_new=True)
+                    if trade_data:
+                        socketio.emit('trade_update', {
+                            'type': 'position_opened',
+                            'data': trade_data,
+                            'timestamp': datetime.now().isoformat()
+                        })
+                        
+                        # Also emit account summary update
+                        emit_account_summary_update()
+                else:
+                    # Check if position was updated (profit changed)
+                    old_pos = last_known_positions[ticket]
+                    old_profit = float(getattr(old_pos, 'profit', 0))
+                    new_profit = float(getattr(pos, 'profit', 0))
+                    old_current_price = float(getattr(old_pos, 'price_current', 0))
+                    new_current_price = float(getattr(pos, 'price_current', 0))
+                    
+                    # Check for profit change or price change (more sensitive for real-time updates)
+                    profit_changed = abs(old_profit - new_profit) > 0.005  # Reduced threshold for more updates
+                    price_changed = abs(old_current_price - new_current_price) > 0.00001  # More sensitive
+                    
+                    if profit_changed or price_changed:
+                        trade_data = format_position_data(pos, is_new=False)
+                        if trade_data:
+                            socketio.emit('trade_update', {
+                                'type': 'position_updated',
+                                'data': trade_data,
+                                'timestamp': datetime.now().isoformat()
+                            })
+                            
+                            # Emit account summary update for any profit changes
+                            emit_account_summary_update()
+            
+            # Check for closed positions with improved detection
+            closed_positions = []
+            for ticket in list(last_known_positions.keys()):
+                if ticket not in current_positions_dict:
+                    closed_positions.append(ticket)
+            
+            # Process closed positions with enhanced deal lookup
+            if closed_positions:
+                log.info(f"Detected {len(closed_positions)} closed positions: {closed_positions}")
+                process_closed_positions(closed_positions, current_time)
+            
+            # Update last known positions
+            last_known_positions = current_positions_dict
+            
+            socketio.sleep(0.5)  # Check every 500ms for faster response
+            
+        except Exception as e:
+            log.error(f"Error in trade monitor: {e}", exc_info=True)
+            socketio.sleep(2)  # Shorter sleep on error for faster recovery
+
+def check_for_new_deals(current_time):
+    """Enhanced deal monitoring to catch closing trades faster"""
+    global last_known_deals
+    
+    try:
+        # Look back 5 minutes for new deals for better detection
+        date_from = current_time - timedelta(minutes=5)
+        date_to = current_time
+        
+        deals = mt5.history_deals_get(date_from, date_to)
+        if not deals:
+            return
+        
+        for deal in deals:
+            deal_ticket = getattr(deal, 'ticket', 0)
+            deal_position_id = getattr(deal, 'position_id', 0)
+            deal_type = getattr(deal, 'type', -1)
+            
+            # Skip if we've already processed this deal
+            if deal_ticket in last_known_deals:
+                continue
+            
+            # Only process actual trade deals
+            if deal_type in [0, 1]:  # BUY or SELL deals
+                last_known_deals.add(deal_ticket)
+                
+                # Check if this is a closing deal for a position we were tracking
+                if deal_position_id in last_known_positions:
+                    # This is a closing deal for a tracked position
+                    try:
+                        closed_trade_data = format_closed_trade_data(
+                            last_known_positions[deal_position_id], deal
+                        )
+                        if closed_trade_data:
+                            socketio.emit('trade_update', {
+                                'type': 'position_closed',
+                                'data': closed_trade_data,
+                                'timestamp': datetime.now().isoformat()
+                            })
+                            log.info(f"Fast-detected position close via deals: {deal_position_id}")
+                            
+                            # Remove from tracked positions
+                            if deal_position_id in last_known_positions:
+                                del last_known_positions[deal_position_id]
+                            
+                            # Emit account summary update
+                            emit_account_summary_update()
+                            
+                            # Also emit a signal to refresh trade history for all clients
+                            socketio.emit('refresh_trade_history', {
+                                'reason': 'new_closed_trade',
+                                'timestamp': datetime.now().isoformat()
+                            })
+                    except Exception as e:
+                        log.error(f"Error processing fast-detected closed trade: {e}")
+                else:
+                    # This might be a trade that was closed when the system wasn't running
+                    # Emit a refresh signal to ensure it's picked up
+                    log.info(f"Detected deal {deal_ticket} for unknown position {deal_position_id}, triggering refresh")
+                    socketio.emit('refresh_trade_history', {
+                        'reason': 'unknown_position_deal',
+                        'deal_ticket': deal_ticket,
+                        'timestamp': datetime.now().isoformat()
+                    })
+        
+        # Cleanup old deals from our tracking set to prevent memory growth
+        if len(last_known_deals) > 1000:
+            # Keep only the most recent 500 deals
+            last_known_deals = set(list(last_known_deals)[-500:])
+            
+    except Exception as e:
+        log.error(f"Error in enhanced deal monitoring: {e}")
+
+def check_immediate_deals(current_time):
+    """Check for very recent deals (last 2 minutes) for immediate detection"""
+    global last_known_deals
+    
+    try:
+        # Look back 2 minutes for immediate detection (increased from 30 seconds)
+        date_from = current_time - timedelta(minutes=2)
+        date_to = current_time
+        
+        deals = mt5.history_deals_get(date_from, date_to)
+        if not deals:
+            return
+        
+        new_deals_found = False
+        for deal in deals:
+            deal_ticket = getattr(deal, 'ticket', 0)
+            deal_position_id = getattr(deal, 'position_id', 0)
+            deal_type = getattr(deal, 'type', -1)
+            
+            # Skip if we've already processed this deal
+            if deal_ticket in last_known_deals:
+                continue
+            
+            # Only process actual trade deals
+            if deal_type in [0, 1]:  # BUY or SELL deals
+                last_known_deals.add(deal_ticket)
+                new_deals_found = True
+                
+                log.info(f"IMMEDIATE: New deal detected - Ticket: {deal_ticket}, Position: {deal_position_id}")
+                
+                # Always emit refresh signal for immediate deals
+                socketio.emit('refresh_trade_history', {
+                    'reason': 'immediate_new_deal',
+                    'deal_ticket': deal_ticket,
+                    'timestamp': datetime.now().isoformat()
+                })
+                
+                # Check if this is a closing deal for a position we were tracking
+                if deal_position_id in last_known_positions:
+                    # This is a closing deal for a tracked position
+                    try:
+                        closed_trade_data = format_closed_trade_data(
+                            last_known_positions[deal_position_id], deal
+                        )
+                        if closed_trade_data:
+                            socketio.emit('trade_update', {
+                                'type': 'position_closed',
+                                'data': closed_trade_data,
+                                'timestamp': datetime.now().isoformat()
+                            })
+                            log.info(f"IMMEDIATE: Emitted position_closed for {deal_position_id}")
+                            
+                            # Remove from tracked positions
+                            if deal_position_id in last_known_positions:
+                                del last_known_positions[deal_position_id]
+                            
+                            # Emit account summary update
+                            emit_account_summary_update()
+                            
+                            # Emit refresh signal for immediate UI update
+                            socketio.emit('refresh_trade_history', {
+                                'reason': 'immediate_closed_trade',
+                                'timestamp': datetime.now().isoformat()
+                            })
+                    except Exception as e:
+                        log.error(f"Error processing immediate closed trade: {e}")
+                else:
+                    # This might be a trade that was closed when system wasn't running
+                    log.info(f"IMMEDIATE: Unknown position deal {deal_ticket} for position {deal_position_id}")
+                    socketio.emit('refresh_trade_history', {
+                        'reason': 'immediate_unknown_deal',
+                        'deal_ticket': deal_ticket,
+                        'timestamp': datetime.now().isoformat()
+                    })
+        
+        if new_deals_found:
+            log.info(f"IMMEDIATE: Found new deals, triggering account summary update")
+            emit_account_summary_update()
+            
+    except Exception as e:
+        log.error(f"Error in immediate deal monitoring: {e}")
+
+def check_full_recent_history(current_time):
+    """Periodically check full recent history to catch any missed trades"""
+    global last_known_deals
+    
+    try:
+        # Look back 10 minutes for comprehensive check
+        date_from = current_time - timedelta(minutes=10)
+        date_to = current_time
+        
+        deals = mt5.history_deals_get(date_from, date_to)
+        if not deals:
+            return
+        
+        new_deals_count = 0
+        for deal in deals:
+            deal_ticket = getattr(deal, 'ticket', 0)
+            deal_type = getattr(deal, 'type', -1)
+            
+            # Skip if we've already processed this deal
+            if deal_ticket in last_known_deals:
+                continue
+            
+            # Only process actual trade deals
+            if deal_type in [0, 1]:  # BUY or SELL deals
+                last_known_deals.add(deal_ticket)
+                new_deals_count += 1
+        
+        if new_deals_count > 0:
+            log.info(f"Full history check found {new_deals_count} new deals, triggering refresh")
+            socketio.emit('refresh_trade_history', {
+                'reason': 'periodic_full_check',
+                'new_deals': new_deals_count,
+                'timestamp': datetime.now().isoformat()
+            })
+            emit_account_summary_update()
+            
+    except Exception as e:
+        log.error(f"Error in full history check: {e}")
+
+def process_closed_positions(closed_positions, current_time):
+    """Process closed positions with enhanced deal lookup"""
+    # Get recent deals to find closing information - look back further
+    date_from = current_time - timedelta(minutes=15)  # Increased to 15 minutes to catch more trades
+    
+    try:
+        deals = mt5.history_deals_get(date_from, current_time)
+        if deals:
+            processed_deals = set()
+            
+            for ticket in closed_positions:
+                if ticket in last_known_positions:
+                    position_found = False
+                    
+                    # Look for closing deals for this position
+                    for deal in deals:
+                        deal_ticket = getattr(deal, 'ticket', 0)
+                        deal_position_id = getattr(deal, 'position_id', 0)
+                        
+                        # Skip if already processed
+                        if deal_ticket in processed_deals:
+                            continue
+                        
+                        if deal_position_id == ticket:
+                            # Found the closing deal
+                            try:
+                                closed_trade_data = format_closed_trade_data(
+                                    last_known_positions[ticket], deal
+                                )
+                                if closed_trade_data:
+                                    socketio.emit('trade_update', {
+                                        'type': 'position_closed',
+                                        'data': closed_trade_data,
+                                        'timestamp': datetime.now().isoformat()
+                                    })
+                                    processed_deals.add(deal_ticket)
+                                    last_known_deals.add(deal_ticket)  # Add to global tracking
+                                    position_found = True
+                                    log.info(f"Emitted position_closed for ticket {ticket}")
+                                    
+                                    # Emit account summary update
+                                    emit_account_summary_update()
+                                    break
+                            except Exception as format_error:
+                                log.error(f"Error formatting closed trade data for {ticket}: {format_error}")
+                    
+                    # If no closing deal found, create basic closed trade info
+                    if not position_found:
+                        log.warning(f"No closing deal found for position {ticket}, creating estimated closed trade")
+                        try:
+                            basic_closed_data = format_basic_closed_trade(last_known_positions[ticket])
+                            if basic_closed_data:
+                                socketio.emit('trade_update', {
+                                    'type': 'position_closed',
+                                    'data': basic_closed_data,
+                                    'timestamp': datetime.now().isoformat()
+                                })
+                                log.info(f"Emitted estimated position_closed for ticket {ticket}")
+                                
+                                # Emit account summary update
+                                emit_account_summary_update()
+                        except Exception as basic_error:
+                            log.error(f"Error creating basic closed trade for {ticket}: {basic_error}")
+    except Exception as deals_error:
+        log.error(f"Error fetching deals for closed positions: {deals_error}")
+
+def emit_account_summary_update():
+    """Emit account summary update to all connected clients"""
+    try:
+        # Get updated account summary
+        if is_mt5_connected():
+            account_info = mt5.account_info()
+            if account_info:
+                # Get current positions for unrealized profit
+                current_positions = mt5.positions_get()
+                if current_positions is None:
+                    current_positions = []
+                
+                # Calculate unrealized profit
+                unrealized_profit = 0.0
+                for position in current_positions:
+                    try:
+                        real_profit = float(getattr(position, 'profit', 0))
+                        swap = float(getattr(position, 'swap', 0))
+                        commission = float(getattr(position, 'commission', 0))
+                        unrealized_profit += real_profit + swap + commission
+                    except Exception as e:
+                        continue
+                
+                # Build quick account update
+                account_update = {
+                    'balance': float(getattr(account_info, 'balance', 0)),
+                    'equity': float(getattr(account_info, 'equity', 0)),
+                    'margin': float(getattr(account_info, 'margin', 0)),
+                    'margin_free': float(getattr(account_info, 'margin_free', 0)),
+                    'total_profit': float(getattr(account_info, 'profit', 0)),
+                    'unrealized_profit': unrealized_profit,
+                    'open_positions': len(current_positions),
+                    'timestamp': datetime.now().isoformat()
+                }
+                
+                # Emit to all connected clients
+                socketio.emit('account_update', account_update)
+                
+    except Exception as e:
+        log.error(f"Error emitting account summary update: {e}")
+
+def format_position_data(position, is_new=False):
+    """Format MT5 position data for frontend"""
+    try:
+        position_type = "BUY" if getattr(position, 'type', 0) == 0 else "SELL"
+        open_time = datetime.fromtimestamp(position.time) if hasattr(position, 'time') else datetime.now()
+        
+        # Calculate real profit
+        real_profit = float(getattr(position, 'profit', 0))
+        swap = float(getattr(position, 'swap', 0))
+        commission = float(getattr(position, 'commission', 0))
+        total_profit = real_profit + swap + commission
+        
+        # Get prices
+        open_price = float(getattr(position, 'price_open', 0))
+        current_price = float(getattr(position, 'price_current', open_price))
+        
+        # Calculate percentage change
+        change_percent = 0.0
+        if open_price > 0 and current_price > 0:
+            if position_type == "BUY":
+                change_percent = ((current_price - open_price) / open_price) * 100
+            else:  # SELL
+                change_percent = ((open_price - current_price) / open_price) * 100
+        
+        return {
+            "id": int(getattr(position, 'ticket', 0)),
+            "ticket": int(getattr(position, 'ticket', 0)),
+            "timestamp": open_time.isoformat(),
+            "time": open_time.isoformat(),
+            "symbol": getattr(position, 'symbol', ''),
+            "type": position_type,
+            "volume": float(getattr(position, 'volume', 0)),
+            "price": open_price,
+            "entry_price": open_price,
+            "current_price": current_price,
+            "sl": float(getattr(position, 'sl', 0)),
+            "tp": float(getattr(position, 'tp', 0)),
+            "profit": total_profit,
+            "raw_profit": real_profit,
+            "commission": commission,
+            "swap": swap,
+            "change_percent": change_percent,
+            "comment": getattr(position, 'comment', ''),
+            "is_open": True,
+            "is_new": is_new
+        }
+    except Exception as e:
+        log.error(f"Error formatting position data: {e}")
+        return None
+
+def format_closed_trade_data(last_position, closing_deal):
+    """Format closed trade data combining position and deal info"""
+    try:
+        position_type = "BUY" if getattr(last_position, 'type', 0) == 0 else "SELL"
+        open_time = datetime.fromtimestamp(last_position.time) if hasattr(last_position, 'time') else datetime.now()
+        close_time = datetime.fromtimestamp(closing_deal.time) if hasattr(closing_deal, 'time') else datetime.now()
+        
+        # Get final profit from the deal
+        total_profit = float(getattr(closing_deal, 'profit', 0))
+        commission = float(getattr(closing_deal, 'commission', 0))
+        swap = float(getattr(closing_deal, 'swap', 0))
+        final_profit = total_profit + commission + swap
+        
+        # Get prices
+        open_price = float(getattr(last_position, 'price_open', 0))
+        close_price = float(getattr(closing_deal, 'price', open_price))
+        
+        # Calculate percentage change
+        change_percent = 0.0
+        if open_price > 0 and close_price > 0:
+            if position_type == "BUY":
+                change_percent = ((close_price - open_price) / open_price) * 100
+            else:  # SELL
+                change_percent = ((open_price - close_price) / open_price) * 100
+        
+        return {
+            "id": int(getattr(last_position, 'ticket', 0)),
+            "ticket": int(getattr(last_position, 'ticket', 0)),
+            "timestamp": open_time.isoformat(),
+            "time": open_time.isoformat(),
+            "close_time": close_time.isoformat(),
+            "symbol": getattr(last_position, 'symbol', ''),
+            "type": position_type,
+            "volume": float(getattr(last_position, 'volume', 0)),
+            "price": open_price,
+            "entry_price": open_price,
+            "exit_price": close_price,
+            "current_price": close_price,
+            "sl": float(getattr(last_position, 'sl', 0)),
+            "tp": float(getattr(last_position, 'tp', 0)),
+            "profit": final_profit,
+            "raw_profit": total_profit,
+            "commission": commission,
+            "swap": swap,
+            "change_percent": change_percent,
+            "comment": getattr(last_position, 'comment', ''),
+            "is_open": False,
+            "just_closed": True
+        }
+    except Exception as e:
+        log.error(f"Error formatting closed trade data: {e}")
+        return None
+
+def format_basic_closed_trade(last_position):
+    """Format basic closed trade data when no closing deal is available"""
+    try:
+        position_type = "BUY" if getattr(last_position, 'type', 0) == 0 else "SELL"
+        open_time = datetime.fromtimestamp(last_position.time) if hasattr(last_position, 'time') else datetime.now()
+        close_time = datetime.now()  # Use current time as close time
+        
+        # Get current market price as estimated close price
+        symbol = getattr(last_position, 'symbol', '')
+        current_price = float(getattr(last_position, 'price_current', 0))
+        open_price = float(getattr(last_position, 'price_open', 0))
+        
+        # If no current price available, use open price
+        if current_price == 0:
+            current_price = open_price
+        
+        # Estimate profit based on current price (may not be exact)
+        volume = float(getattr(last_position, 'volume', 0))
+        estimated_profit = 0.0
+        
+        if open_price > 0 and current_price > 0:
+            if position_type == "BUY":
+                estimated_profit = (current_price - open_price) * volume * 100  # Rough estimation
+            else:  # SELL
+                estimated_profit = (open_price - current_price) * volume * 100  # Rough estimation
+        
+        # Calculate percentage change
+        change_percent = 0.0
+        if open_price > 0 and current_price > 0:
+            if position_type == "BUY":
+                change_percent = ((current_price - open_price) / open_price) * 100
+            else:  # SELL
+                change_percent = ((open_price - current_price) / open_price) * 100
+        
+        return {
+            "id": int(getattr(last_position, 'ticket', 0)),
+            "ticket": int(getattr(last_position, 'ticket', 0)),
+            "timestamp": open_time.isoformat(),
+            "time": open_time.isoformat(),
+            "close_time": close_time.isoformat(),
+            "symbol": symbol,
+            "type": position_type,
+            "volume": volume,
+            "price": open_price,
+            "entry_price": open_price,
+            "exit_price": current_price,
+            "current_price": current_price,
+            "sl": float(getattr(last_position, 'sl', 0)),
+            "tp": float(getattr(last_position, 'tp', 0)),
+            "profit": estimated_profit,
+            "raw_profit": estimated_profit,
+            "commission": 0.0,  # Unknown without deal
+            "swap": 0.0,  # Unknown without deal
+            "change_percent": change_percent,
+            "comment": getattr(last_position, 'comment', ''),
+            "is_open": False,
+            "just_closed": True,
+            "estimated": True  # Flag to indicate this is estimated data
+        }
+    except Exception as e:
+        log.error(f"Error formatting basic closed trade data: {e}")
+        return None
+
+def check_new_historical_trades():
+    """Check for new completed trades in recent history"""
+    global last_known_deals
+    
+    try:
+        # Check last 5 minutes of deals
+        date_to = datetime.now()
+        date_from = date_to - timedelta(minutes=5)
+        
+        deals = mt5.history_deals_get(date_from, date_to)
+        if deals:
+            for deal in deals:
+                deal_ticket = getattr(deal, 'ticket', 0)
+                
+                # Skip if we've already processed this deal
+                if deal_ticket in last_known_deals:
+                    continue
+                
+                # Add to known deals
+                last_known_deals.add(deal_ticket)
+                
+                # Only emit for actual trades (not balance operations)
+                deal_type = getattr(deal, 'type', -1)
+                if deal_type in [0, 1]:  # BUY or SELL deals
+                    log.info(f"New historical deal detected: {deal_ticket}")
+                    # You could emit this as a historical trade update if needed
+    
+    except Exception as e:
+        log.error(f"Error checking historical trades: {e}")
+        return None
+
 # --- Flask Routes ---
 @app.route('/status')
 def status():
@@ -528,6 +1140,257 @@ def status():
         "symbol": SYMBOL, 
         "timestamp": datetime.now().isoformat()
     })
+
+@app.route('/force-refresh-trades')
+def force_refresh_trades():
+    """Force refresh trade data - useful for immediate updates without server restart"""
+    if 'username' not in session:
+        return jsonify({"error": "Please login to access trade data"}), 401
+    
+    try:
+        # Emit refresh signal to all clients
+        socketio.emit('refresh_trade_history', {
+            'reason': 'manual_force_refresh',
+            'timestamp': datetime.now().isoformat()
+        })
+        
+        # Also emit account summary update
+        emit_account_summary_update()
+        
+        return jsonify({
+            "status": "success",
+            "message": "Trade refresh triggered",
+            "timestamp": datetime.now().isoformat()
+        })
+        
+    except Exception as e:
+        log.error(f"Error forcing trade refresh: {e}", exc_info=True)
+        return jsonify({"error": "Failed to refresh trades"}), 500
+
+@app.route('/account-summary')
+def get_account_summary():
+    """Get comprehensive account summary with unified profit calculations"""
+    if 'username' not in session:
+        return jsonify({"error": "Please login to access account summary"}), 401
+    
+    try:
+        if not is_mt5_connected():
+            return jsonify({"error": "MT5 connection not available"}), 503
+        
+        # Get real account data from MT5
+        account_info = mt5.account_info()
+        if account_info is None:
+            log.error(f"Failed to get account info from MT5: {mt5.last_error()}")
+            return jsonify({"error": "Failed to retrieve account information from MT5"}), 500
+        
+        # Get current open positions for unrealized profit
+        current_positions = []
+        try:
+            current_positions = mt5.positions_get()
+            if current_positions is None:
+                current_positions = []
+        except Exception as e:
+            log.error(f"Error fetching open positions for summary: {e}")
+            current_positions = []
+        
+        # Calculate unrealized profit from open positions
+        unrealized_profit = 0.0
+        position_count = len(current_positions)
+        for position in current_positions:
+            try:
+                real_profit = float(getattr(position, 'profit', 0))
+                swap = float(getattr(position, 'swap', 0))
+                commission = float(getattr(position, 'commission', 0))
+                unrealized_profit += real_profit + swap + commission
+            except Exception as e:
+                log.error(f"Error calculating unrealized profit for position: {e}")
+                continue
+        
+        # Get historical deals for realized profit (last 6 months)
+        date_to = datetime.now()
+        date_from = date_to - timedelta(days=180)
+        
+        deals = []
+        try:
+            deals = mt5.history_deals_get(date_from, date_to)
+            if deals is None:
+                deals = []
+        except Exception as e:
+            log.error(f"Error fetching deals for realized profit: {e}")
+            deals = []
+        
+        # Calculate realized profit and trade statistics
+        realized_profit = 0.0
+        winning_trades = 0
+        losing_trades = 0
+        closed_trades_count = 0
+        processed_positions = {}  # Track positions with their profit
+        
+        # Group deals by position to calculate per-trade profit
+        deal_groups = {}
+        for deal in deals:
+            try:
+                deal_type = getattr(deal, 'type', -1)
+                position_id = getattr(deal, 'position_id', 0)
+                
+                # Only process actual trade deals
+                if deal_type in [0, 1] and position_id > 0:
+                    if position_id not in deal_groups:
+                        deal_groups[position_id] = []
+                    deal_groups[position_id].append(deal)
+                    
+            except Exception as e:
+                log.error(f"Error grouping deal for statistics: {e}")
+                continue
+        
+        # Process each position's deals
+        for position_id, position_deals in deal_groups.items():
+            try:
+                # Calculate total P/L for this position
+                position_profit = 0.0
+                position_commission = 0.0
+                position_swap = 0.0
+                
+                for deal in position_deals:
+                    position_profit += float(getattr(deal, 'profit', 0))
+                    position_commission += float(getattr(deal, 'commission', 0))
+                    position_swap += float(getattr(deal, 'swap', 0))
+                
+                total_position_pl = position_profit + position_commission + position_swap
+                
+                # Add to realized profit
+                realized_profit += total_position_pl
+                
+                # Determine if this is a closed position (has at least 2 deals or profit != 0)
+                is_closed = len(position_deals) >= 2 or (len(position_deals) == 1 and position_profit != 0)
+                
+                if is_closed:
+                    closed_trades_count += 1
+                    
+                    # Count wins/losses
+                    if total_position_pl > 0:
+                        winning_trades += 1
+                    elif total_position_pl < 0:
+                        losing_trades += 1
+                    # If exactly 0, don't count as win or loss
+                    
+                    processed_positions[position_id] = total_position_pl
+                    
+            except Exception as e:
+                log.error(f"Error processing position {position_id} for statistics: {e}")
+                continue
+        
+        # Log detailed statistics
+        log.info(f"Account Summary Statistics:")
+        log.info(f"  - Total deals processed: {len(deals)}")
+        log.info(f"  - Unique positions: {len(deal_groups)}")
+        log.info(f"  - Closed trades: {closed_trades_count}")
+        log.info(f"  - Winning trades: {winning_trades}")
+        log.info(f"  - Losing trades: {losing_trades}")
+        log.info(f"  - Realized P/L: ${realized_profit:.2f}")
+        log.info(f"  - Unrealized P/L: ${unrealized_profit:.2f}")
+        
+        # Build comprehensive account summary
+        account_summary = {
+            # Basic account info
+            "id": int(getattr(account_info, 'login', 0)),
+            "username": session.get('username', getattr(account_info, 'name', 'MT5 User')),
+            "currency": getattr(account_info, 'currency', 'USD'),
+            "server": getattr(account_info, 'server', ''),
+            "company": getattr(account_info, 'company', ''),
+            
+            # Core account metrics
+            "balance": float(getattr(account_info, 'balance', 0)),
+            "equity": float(getattr(account_info, 'equity', 0)),
+            "margin": float(getattr(account_info, 'margin', 0)),
+            "margin_free": float(getattr(account_info, 'margin_free', 0)),
+            "margin_level": float(getattr(account_info, 'margin_level', 0)),
+            
+            # Profit breakdown
+            "total_profit": float(getattr(account_info, 'profit', 0)),  # This should match unrealized_profit
+            "realized_profit": realized_profit,
+            "unrealized_profit": unrealized_profit,
+            
+            # Trading statistics
+            "open_positions": position_count,
+            "closed_trades_6m": closed_trades_count,
+            "winning_trades": winning_trades,
+            "losing_trades": losing_trades,
+            "win_rate": (winning_trades / closed_trades_count * 100) if closed_trades_count > 0 else 0,
+            
+            # Account settings
+            "leverage": f"1:{int(getattr(account_info, 'leverage', 100))}",
+            "trade_allowed": bool(getattr(account_info, 'trade_allowed', False)),
+            "trade_expert": bool(getattr(account_info, 'trade_expert', False)),
+            
+            # Timestamps
+            "lastUpdate": datetime.now().isoformat(),
+            "summary_generated": datetime.now().isoformat()
+        }
+        
+        # Add aliases for frontend compatibility
+        account_summary['freeMargin'] = account_summary['margin_free']
+        account_summary['marginLevel'] = account_summary['margin_level']
+        account_summary['profit'] = account_summary['total_profit']  # For backward compatibility
+        
+        log.info(f"Generated account summary: Balance={account_summary['balance']:.2f}, "
+                f"Realized={realized_profit:.2f}, Unrealized={unrealized_profit:.2f}, "
+                f"Total={account_summary['total_profit']:.2f}, Win Rate={account_summary['win_rate']:.1f}%")
+        
+        return jsonify(account_summary)
+        
+    except Exception as e:
+        log.error(f"Error generating account summary: {e}", exc_info=True)
+        return jsonify({"error": "Failed to generate account summary"}), 500
+
+@app.route('/realized-profit')
+def get_realized_profit():
+    """Get realized profit from closed trades only (deprecated - use /account-summary instead)"""
+    if 'username' not in session:
+        return jsonify({"error": "Please login to access realized profit"}), 401
+    
+    try:
+        if not is_mt5_connected():
+            return jsonify({"error": "MT5 connection not available"}), 503
+        
+        # Set date range for the last 6 months (180 days)
+        date_to = datetime.now()
+        date_from = date_to - timedelta(days=180)
+        
+        # Get historical deals (completed trades)
+        deals = []
+        try:
+            deals = mt5.history_deals_get(date_from, date_to)
+            if deals is None:
+                deals = []
+        except Exception as e:
+            log.error(f"Error fetching deals for realized profit: {e}")
+            deals = []
+        
+        # Calculate total realized profit from deals
+        total_realized_profit = 0
+        for deal in deals:
+            try:
+                # Only include actual trade deals (not balance operations)
+                deal_type = getattr(deal, 'type', -1)
+                if deal_type in [0, 1]:  # BUY or SELL deals
+                    profit = float(getattr(deal, 'profit', 0))
+                    commission = float(getattr(deal, 'commission', 0))
+                    swap = float(getattr(deal, 'swap', 0))
+                    total_realized_profit += profit + commission + swap
+            except Exception as e:
+                log.error(f"Error processing deal for realized profit: {e}")
+                continue
+        
+        return jsonify({
+            "realized_profit": total_realized_profit,
+            "currency": "USD",
+            "timestamp": datetime.now().isoformat()
+        })
+        
+    except Exception as e:
+        log.error(f"Error calculating realized profit: {e}", exc_info=True)
+        return jsonify({"error": "Failed to calculate realized profit"}), 500
 
 # --- Removed duplicate endpoint - using /account instead ---
 
@@ -985,9 +1848,9 @@ def get_trade_history():
             log.warning("MT5 not connected for trade history request")
             return jsonify({"error": "MT5 connection not available"}), 503
         
-        # Set date range for the last 30 days
-        date_to = datetime.now()
-        date_from = date_to - timedelta(days=30)
+        # Set date range for the last 6 months (180 days) with extended current day coverage
+        date_to = datetime.now() + timedelta(hours=1)  # Add 1 hour buffer for current day
+        date_from = date_to - timedelta(days=180)
         
         log.info(f"Fetching MT5 trade history from {date_from} to {date_to}")
         
@@ -997,9 +1860,28 @@ def get_trade_history():
             deals = mt5.history_deals_get(date_from, date_to)
             if deals is None:
                 log.warning(f"No deals returned from MT5: {mt5.last_error()}")
-                deals = []
+                # Try alternative approach - get today's deals separately
+                today_start = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+                today_deals = mt5.history_deals_get(today_start, datetime.now())
+                if today_deals:
+                    deals = list(today_deals)
+                    log.info(f"Retrieved {len(deals)} today's deals as fallback")
+                else:
+                    deals = []
             else:
                 log.info(f"Retrieved {len(deals)} historical deals from {date_from.date()} to {date_to.date()}")
+                
+                # Also fetch today's deals separately to ensure we have the latest
+                today_start = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+                today_deals = mt5.history_deals_get(today_start, datetime.now())
+                if today_deals:
+                    # Combine with existing deals, avoiding duplicates
+                    existing_tickets = {getattr(d, 'ticket', 0) for d in deals}
+                    new_deals = [d for d in today_deals if getattr(d, 'ticket', 0) not in existing_tickets]
+                    if new_deals:
+                        deals.extend(new_deals)
+                        log.info(f"Added {len(new_deals)} additional today's deals")
+                        
         except Exception as e:
             log.error(f"Error fetching deals: {e}", exc_info=True)
             deals = []
@@ -1025,45 +1907,82 @@ def get_trade_history():
         for deal in deals:
             try:
                 position_id = getattr(deal, 'position_id', 0)
-                if position_id not in deal_groups:
-                    deal_groups[position_id] = []
-                deal_groups[position_id].append(deal)
+                deal_type = getattr(deal, 'type', -1)
+                
+                # Skip non-trade deals (balance operations, etc.)
+                if deal_type not in [0, 1]:  # Only BUY or SELL deals
+                    continue
+                    
+                if position_id > 0:  # Valid position ID
+                    if position_id not in deal_groups:
+                        deal_groups[position_id] = []
+                    deal_groups[position_id].append(deal)
             except Exception as e:
                 log.error(f"Error processing deal {getattr(deal, 'ticket', 'unknown')}: {e}")
                 continue
         
-        # Convert deal groups to trades
+        # Convert deal groups to trades - improved logic
         for position_id, position_deals in deal_groups.items():
-            if len(position_deals) >= 2:  # At least entry and exit
-                try:
-                    # Sort deals by time
-                    position_deals.sort(key=lambda d: getattr(d, 'time', 0))
-                    
-                    entry_deal = position_deals[0]
+            try:
+                # Sort deals by time
+                position_deals.sort(key=lambda d: getattr(d, 'time', 0))
+                
+                # We need at least one deal to create a trade record
+                if len(position_deals) == 0:
+                    continue
+                
+                # Find entry and exit deals
+                entry_deal = None
+                exit_deal = None
+                
+                # The first deal is typically the entry
+                entry_deal = position_deals[0]
+                
+                # If we have multiple deals, the last one might be the exit
+                if len(position_deals) > 1:
                     exit_deal = position_deals[-1]
                     
-                    # Calculate total profit from all deals in this position
-                    total_profit = sum(float(getattr(d, 'profit', 0)) for d in position_deals)
-                    total_commission = sum(float(getattr(d, 'commission', 0)) for d in position_deals)
-                    total_swap = sum(float(getattr(d, 'swap', 0)) for d in position_deals)
+                    # Verify this is actually a closing deal by checking if it's the opposite type
+                    entry_type = getattr(entry_deal, 'type', -1)
+                    exit_type = getattr(exit_deal, 'type', -1)
                     
-                    # Determine trade type from deal type
-                    entry_type = getattr(entry_deal, 'type', 0)
-                    # MT5 deal types: 0=BUY, 1=SELL, 2=BALANCE, 3=CREDIT, 4=CHARGE, 5=CORRECTION, 6=BONUS, 7=COMMISSION, 8=DIVIDEND, 9=DIVIDEND_FRANKED, 10=TAX
-                    if entry_type == 0:  # DEAL_TYPE_BUY
-                        trade_type = "BUY"
-                    elif entry_type == 1:  # DEAL_TYPE_SELL
-                        trade_type = "SELL"
-                    else:
-                        # For other deal types, try to determine from volume sign
-                        volume = float(getattr(entry_deal, 'volume', 0))
-                        trade_type = "BUY" if volume > 0 else "SELL"
-                    
-                    # Get trade details
-                    symbol = getattr(entry_deal, 'symbol', '')
-                    volume = float(getattr(entry_deal, 'volume', 0))
-                    entry_price = float(getattr(entry_deal, 'price', 0))
-                    exit_price = float(getattr(exit_deal, 'price', 0))
+                    # If they're the same type, it's not a closing deal
+                    if entry_type == exit_type:
+                        exit_deal = None
+                
+                # Calculate total profit, commission, and swap from ALL deals in this position
+                total_profit = 0.0
+                total_commission = 0.0
+                total_swap = 0.0
+                total_volume = 0.0
+                
+                for deal in position_deals:
+                    total_profit += float(getattr(deal, 'profit', 0))
+                    total_commission += float(getattr(deal, 'commission', 0))
+                    total_swap += float(getattr(deal, 'swap', 0))
+                    total_volume += float(getattr(deal, 'volume', 0))
+                
+                # Determine trade type from entry deal
+                entry_type = getattr(entry_deal, 'type', 0)
+                if entry_type == 0:  # DEAL_TYPE_BUY
+                    trade_type = "BUY"
+                elif entry_type == 1:  # DEAL_TYPE_SELL
+                    trade_type = "SELL"
+                else:
+                    # Skip non-trade deals
+                    continue
+                
+                # Get trade details
+                symbol = getattr(entry_deal, 'symbol', '')
+                entry_price = float(getattr(entry_deal, 'price', 0))
+                
+                # Determine if trade is closed
+                is_closed = exit_deal is not None
+                
+                if is_closed:
+                    # Closed trade
+                    exit_price = float(getattr(exit_deal, 'price', entry_price))
+                    close_time = datetime.fromtimestamp(getattr(exit_deal, 'time', 0))
                     
                     # Calculate percentage change
                     change_percent = 0.0
@@ -1073,16 +1992,16 @@ def get_trade_history():
                         else:  # SELL
                             change_percent = ((entry_price - exit_price) / entry_price) * 100
                     
-                    # Create trade data
+                    # Create closed trade data
                     trade_data = {
                         "id": int(position_id),
                         "ticket": int(position_id),
                         "timestamp": datetime.fromtimestamp(getattr(entry_deal, 'time', 0)).isoformat(),
                         "time": datetime.fromtimestamp(getattr(entry_deal, 'time', 0)).isoformat(),
-                        "close_time": datetime.fromtimestamp(getattr(exit_deal, 'time', 0)).isoformat(),
+                        "close_time": close_time.isoformat(),
                         "symbol": symbol,
                         "type": trade_type,
-                        "volume": volume,
+                        "volume": float(getattr(entry_deal, 'volume', total_volume)),
                         "price": entry_price,
                         "entry_price": entry_price,
                         "exit_price": exit_price,
@@ -1096,17 +2015,61 @@ def get_trade_history():
                         "change_percent": change_percent,
                         "comment": getattr(entry_deal, 'comment', ''),
                         "identifier": position_id,
-                        "reason": getattr(exit_deal, 'reason', None),
+                        "reason": getattr(exit_deal, 'reason', None) if exit_deal else None,
                         "is_open": False
                     }
                     
                     closed_trades.append(trade_data)
-                    log.info(f"Processed closed trade {position_id}: {trade_type} {volume} {symbol} "
+                    log.info(f"Processed closed trade {position_id}: {trade_type} {trade_data['volume']} {symbol} "
                             f"entry: {entry_price}, exit: {exit_price}, profit: {total_profit:.2f}")
+                else:
+                    # This might be a partially filled position or a position that's still open
+                    # Check if it's in current positions
+                    is_in_current_positions = any(
+                        getattr(pos, 'ticket', 0) == position_id 
+                        for pos in current_positions
+                    )
                     
-                except Exception as e:
-                    log.error(f"Error processing position {position_id}: {e}")
-                    continue
+                    if not is_in_current_positions and len(position_deals) == 1:
+                        # Single deal that's not in current positions - might be a closed trade
+                        # where we only have the closing deal
+                        current_price = entry_price
+                        
+                        # Create a record for this trade
+                        trade_data = {
+                            "id": int(position_id),
+                            "ticket": int(position_id),
+                            "timestamp": datetime.fromtimestamp(getattr(entry_deal, 'time', 0)).isoformat(),
+                            "time": datetime.fromtimestamp(getattr(entry_deal, 'time', 0)).isoformat(),
+                            "close_time": datetime.fromtimestamp(getattr(entry_deal, 'time', 0)).isoformat(),
+                            "symbol": symbol,
+                            "type": trade_type,
+                            "volume": float(getattr(entry_deal, 'volume', 0)),
+                            "price": entry_price,
+                            "entry_price": entry_price,
+                            "exit_price": entry_price,
+                            "current_price": entry_price,
+                            "sl": 0.0,
+                            "tp": 0.0,
+                            "profit": total_profit + total_commission + total_swap,
+                            "raw_profit": total_profit,
+                            "commission": total_commission,
+                            "swap": total_swap,
+                            "change_percent": 0.0,
+                            "comment": getattr(entry_deal, 'comment', ''),
+                            "identifier": position_id,
+                            "reason": getattr(entry_deal, 'reason', None),
+                            "is_open": False,
+                            "single_deal": True  # Flag to indicate this is from a single deal
+                        }
+                        
+                        if total_profit != 0:  # Only add if there's actual profit/loss
+                            closed_trades.append(trade_data)
+                            log.info(f"Added single-deal trade {position_id}: profit: {total_profit:.2f}")
+                    
+            except Exception as e:
+                log.error(f"Error processing position {position_id}: {e}", exc_info=True)
+                continue
         
         # Convert current open positions to trade format
         for position in current_positions:
@@ -1181,7 +2144,14 @@ def get_trade_history():
         # Combine all trades (closed + open)
         all_trades = closed_trades + open_trades
         
-        log.info(f"Trade processing summary: {len(closed_trades)} closed trades, {len(open_trades)} open positions")
+        # Calculate summary statistics for logging
+        total_closed_trades = len(closed_trades)
+        total_open_trades = len(open_trades)
+        total_realized_pl = sum(t['profit'] for t in closed_trades)
+        total_unrealized_pl = sum(t['profit'] for t in open_trades)
+        
+        log.info(f"Trade processing summary: {total_closed_trades} closed trades, {total_open_trades} open positions")
+        log.info(f"Realized P/L: ${total_realized_pl:.2f}, Unrealized P/L: ${total_unrealized_pl:.2f}")
         
         if len(all_trades) == 0:
             log.info("No trades found in MT5 account - returning empty list")
@@ -1392,8 +2362,8 @@ def handle_connect(auth=None):
     # Send an immediate dummy update to confirm data flow works
     send_timeframe_update(request.sid, timeframe)
     
-    # --- Start the background task if not running ---
-    global thread
+    # --- Start the background tasks if not running ---
+    global thread, trade_monitor_thread
     with thread_lock:
         if thread is None:
             log.info("Starting background price updater task...")
@@ -1402,6 +2372,15 @@ def handle_connect(auth=None):
             else: log.error("Failed to start background task.")
         else: 
             log.info("Background task already running.")
+        
+        # Start trade monitor thread
+        if trade_monitor_thread is None:
+            log.info("Starting background trade monitor task...")
+            trade_monitor_thread = socketio.start_background_task(target=background_trade_monitor)
+            if trade_monitor_thread: log.info("Trade monitor task started successfully.")
+            else: log.error("Failed to start trade monitor task.")
+        else:
+            log.info("Trade monitor task already running.")
 
 @socketio.on('disconnect')
 def handle_disconnect(*args):

@@ -203,8 +203,8 @@
 .dashboard-info-panels {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 25px; /* Increased gap */
-  padding: 30px; /* Increased padding */
+  gap: 25px; /* Back to original gap for 4 panels */
+  padding: 30px; /* Back to original padding */
   width: 100vw;
   background: rgba(31, 41, 55, 0.3);
   flex-shrink: 0;
@@ -240,6 +240,16 @@
   font-size: 1.8rem; /* Increased from 1.5rem */
   font-weight: 700; /* Bolder */
   margin: 0;
+}
+
+.info-panel .panel-subtitle {
+  color: #9ca3af;
+  font-size: 0.75rem;
+  font-weight: 400;
+  margin-top: 8px;
+  display: block;
+  text-transform: none;
+  letter-spacing: 0.5px;
 }
 
 .info-panel.profit .value {
@@ -298,6 +308,22 @@
   .tab-content .chart-container {
     height: calc(100vh - 90px) !important;
     min-height: 400px;
+  }
+}
+
+@media (max-width: 768px) {
+  .dashboard-info-panels {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+    padding: 15px;
+  }
+  
+  .info-panel {
+    padding: 20px;
+  }
+  
+  .info-panel .value {
+    font-size: 1.5rem;
   }
 }
 

@@ -1,5 +1,166 @@
 /* TradeHistory.css - Full Viewport Professional Layout */
 
+/* Real-time update indicators */
+.trade-history-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+}
+
+.trade-history-header h2 {
+    margin-bottom: 0;
+}
+
+.header-controls {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+.refresh-button {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 16px;
+    background: rgba(82, 196, 26, 0.1);
+    color: #52c41a;
+    border: 1px solid rgba(82, 196, 26, 0.3);
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    font-weight: 500;
+    transition: all 0.3s ease;
+}
+
+.refresh-button:hover:not(:disabled) {
+    background: rgba(82, 196, 26, 0.2);
+    border-color: rgba(82, 196, 26, 0.5);
+    transform: translateY(-1px);
+}
+
+.refresh-button:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.refresh-button svg {
+    transition: transform 0.3s ease;
+}
+
+.refresh-button:hover:not(:disabled) svg {
+    transform: rotate(180deg);
+}
+
+.last-update {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: #9ca3af;
+    font-size: 0.9rem;
+}
+
+.update-indicator {
+    width: 8px;
+    height: 8px;
+    background: #52c41a;
+    border-radius: 50%;
+    display: inline-block;
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0% {
+        box-shadow: 0 0 0 0 rgba(82, 196, 26, 0.7);
+    }
+    70% {
+        box-shadow: 0 0 0 10px rgba(82, 196, 26, 0);
+    }
+    100% {
+        box-shadow: 0 0 0 0 rgba(82, 196, 26, 0);
+    }
+}
+
+/* New trade animation */
+.new-trade {
+    animation: newTradeHighlight 3s ease-out;
+}
+
+@keyframes newTradeHighlight {
+    0% {
+        background-color: rgba(82, 196, 26, 0.3);
+        transform: scale(1.02);
+    }
+    100% {
+        background-color: transparent;
+        transform: scale(1);
+    }
+}
+
+/* Updated trade animation */
+.updated-trade {
+    animation: updatePulse 1s ease-out;
+}
+
+@keyframes updatePulse {
+    0% {
+        background-color: rgba(59, 130, 246, 0.3);
+    }
+    100% {
+        background-color: transparent;
+    }
+}
+
+/* Just closed trade animation */
+.just-closed {
+    animation: closedHighlight 3s ease-out;
+}
+
+@keyframes closedHighlight {
+    0% {
+        background-color: rgba(239, 68, 68, 0.3);
+        transform: scale(1.02);
+    }
+    100% {
+        background-color: transparent;
+        transform: scale(1);
+    }
+}
+
+/* Badge styles */
+.new-badge {
+    background: #52c41a;
+    color: white;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    margin-left: 8px;
+    animation: badgeFadeIn 0.5s ease-out;
+}
+
+.closed-badge {
+    background: #ef4444;
+    color: white;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    margin-left: 8px;
+    animation: badgeFadeIn 0.5s ease-out;
+}
+
+@keyframes badgeFadeIn {
+    from {
+        opacity: 0;
+        transform: scale(0.8);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
 /* Main container - Full viewport usage */
 .trade-history-container {
     width: 100vw;
@@ -13,7 +174,6 @@
 
 .trade-history-container h2 {
     color: #52c41a;
-    margin-bottom: 30px;
     font-size: 2.2rem; /* Increased size */
     text-align: center;
     font-weight: 700; /* Bolder */

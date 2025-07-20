@@ -261,7 +261,7 @@ logging.basicConfig(level=logging.DEBUG)
 
 ## 📝 License
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+This project is licensed under the Mohib License - see the LICENSE file for details.
 
 ## 🤝 Contributing
 
@@ -271,12 +271,6 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 4. Push to the branch (`git push origin feature/AmazingFeature`)
 5. Open a Pull Request
 
-## 📞 Support
-
-For support and questions:
-- Create an issue on GitHub
-- Check the troubleshooting section
-- Review the integration guide
 
 ## 🔄 Version History
 

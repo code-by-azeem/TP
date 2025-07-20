@@ -14,34 +14,62 @@ const Dashboard = () => {
     balance: 0,
     equity: 0,
     margin: 0,
-    profit: 0
+    profit: 0,
+    unrealized_profit: 0,
+    open_positions: 0
   });
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('chart'); // Default to chart view
   const [socket, setSocket] = useState(null);
   
-  // Fetch account data - wrapped in useCallback to prevent recreation on each render
+  // Fetch comprehensive account data using new unified endpoint
   const fetchAccountData = useCallback(async () => {
     setIsLoading(true);
     try {
-      const response = await fetch('http://localhost:5000/account', {
+      const response = await fetch('http://localhost:5000/account-summary', {
         credentials: 'include',
       });
       
       if (response.ok) {
         const data = await response.json();
-        // Map MT5 fields to our expected format
+        // Map comprehensive account data
         setAccountData({
           id: data.login || data.id,
           balance: data.balance || 0,
           equity: data.equity || 0,
           margin: data.margin || 0,
-          profit: data.profit || 0,
+          profit: data.total_profit || 0,
+          unrealized_profit: data.unrealized_profit || 0,
+          open_positions: data.open_positions || 0,
           marginLevel: data.margin_level || data.marginLevel || 0,
           currency: data.currency || 'USD',
           leverage: data.leverage || '1:100',
           lastUpdate: data.lastUpdate || new Date().toISOString()
         });
+
+      } else {
+        // Fallback to old account endpoint if new one fails
+        console.warn('Account summary not available, falling back to basic account info');
+        const fallbackResponse = await fetch('http://localhost:5000/account', {
+          credentials: 'include',
+        });
+        
+        if (fallbackResponse.ok) {
+          const fallbackData = await fallbackResponse.json();
+          setAccountData({
+            id: fallbackData.login || fallbackData.id,
+            balance: fallbackData.balance || 0,
+            equity: fallbackData.equity || 0,
+            margin: fallbackData.margin || 0,
+            profit: fallbackData.profit || 0,
+            unrealized_profit: fallbackData.profit || 0,
+            open_positions: 0,
+            marginLevel: fallbackData.margin_level || fallbackData.marginLevel || 0,
+            currency: fallbackData.currency || 'USD',
+            leverage: fallbackData.leverage || '1:100',
+            lastUpdate: fallbackData.lastUpdate || new Date().toISOString()
+          });
+        }
       }
     } catch (error) {
       console.error('Error fetching account data:', error);
@@ -68,13 +96,60 @@ const Dashboard = () => {
         } else if (data.username) {
           setUsername(data.username);
           
-          // Fetch account data
+          // Fetch comprehensive account data
           fetchAccountData();
           
           // Initialize socket connection
           newSocket = io('http://localhost:5000', {
             transports: ['websocket', 'polling'],
             autoConnect: true,
+          });
+          
+          // Listen for trade updates to update account data in real-time
+          newSocket.on('trade_update', (data) => {
+            console.log('Dashboard received trade update:', data);
+            
+            // For position updates, refresh account data to get latest unrealized P/L
+            if (data.type === 'position_updated' || data.type === 'position_opened') {
+              fetchAccountData();
+            }
+            // For position closed, wait a moment then refresh to ensure backend has processed
+            else if (data.type === 'position_closed') {
+              setTimeout(() => {
+                fetchAccountData();
+              }, 500);
+            }
+          });
+          
+          // Listen for direct account updates for instant updates
+          newSocket.on('account_update', (accountUpdate) => {
+            console.log('Dashboard received account update:', accountUpdate);
+            setAccountData(prevData => ({
+              ...prevData,
+              balance: accountUpdate.balance || prevData.balance,
+              equity: accountUpdate.equity || prevData.equity,
+              margin: accountUpdate.margin || prevData.margin,
+              margin_free: accountUpdate.margin_free || prevData.margin_free,
+              profit: accountUpdate.total_profit || prevData.profit,
+              unrealized_profit: accountUpdate.unrealized_profit || prevData.unrealized_profit,
+              open_positions: accountUpdate.open_positions || prevData.open_positions,
+              lastUpdate: accountUpdate.timestamp || new Date().toISOString()
+            }));
+          });
+          
+          // Enhanced connection monitoring
+          newSocket.on('connect', () => {
+            console.log('Dashboard WebSocket connected');
+            // Refresh data on reconnection
+            fetchAccountData();
+          });
+          
+          newSocket.on('disconnect', (reason) => {
+            console.log('Dashboard WebSocket disconnected:', reason);
+          });
+          
+          newSocket.on('connect_error', (error) => {
+            console.error('Dashboard WebSocket connection error:', error);
           });
           
           setSocket(newSocket);
@@ -135,7 +210,7 @@ const Dashboard = () => {
       case 'account':
         return renderAccountDetails();
       case 'history':
-        return <TradeHistory />;
+        return <TradeHistory socket={socket} />;
       case 'bot':
         return <TradingBot socket={socket} />;
       case 'chart':
@@ -260,9 +335,10 @@ const Dashboard = () => {
             <h3>Margin</h3>
             <p className="value">{isLoading ? '—' : formatCurrency(accountData.margin)}</p>
           </div>
-          <div className={`info-panel ${accountData.profit >= 0 ? 'profit' : 'loss'}`}>
-            <h3>Profit</h3>
-            <p className="value">{isLoading ? '—' : formatCurrency(accountData.profit)}</p>
+          <div className={`info-panel ${accountData.unrealized_profit >= 0 ? 'profit' : 'loss'}`}>
+            <h3>Unrealized P/L</h3>
+            <p className="value">{isLoading ? '—' : formatCurrency(accountData.unrealized_profit)}</p>
+            <span className="panel-subtitle">{accountData.open_positions} open positions</span>
           </div>
         </div>
       )}

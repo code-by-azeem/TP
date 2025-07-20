@@ -105,20 +105,12 @@ const Dashboard = () => {
             autoConnect: true,
           });
           
-          // Listen for trade updates to update account data in real-time
+          // Listen for trade updates to update account data in real-time (immediate)
           newSocket.on('trade_update', (data) => {
             console.log('Dashboard received trade update:', data);
             
-            // For position updates, refresh account data to get latest unrealized P/L
-            if (data.type === 'position_updated' || data.type === 'position_opened') {
-              fetchAccountData();
-            }
-            // For position closed, wait a moment then refresh to ensure backend has processed
-            else if (data.type === 'position_closed') {
-              setTimeout(() => {
-                fetchAccountData();
-              }, 500);
-            }
+            // Immediate account data refresh for all trade types - no delays
+            fetchAccountData();
           });
           
           // Listen for direct account updates for instant updates

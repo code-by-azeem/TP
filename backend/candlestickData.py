@@ -551,15 +551,15 @@ def background_trade_monitor():
                 socketio.sleep(1)
                 continue
             
-            # Enhanced deal monitoring - check for new deals every 500ms for immediate detection
-            if (current_time - last_deal_check).total_seconds() >= 0.5:
+            # Enhanced deal monitoring - check for new deals every 250ms for ultra-fast detection
+            if (current_time - last_deal_check).total_seconds() >= 0.25:
                 check_for_new_deals(current_time)
-                # Also check for very recent deals (last 2 minutes) for immediate detection
+                # Also check for very recent deals (last 1 minute) for immediate detection
                 check_immediate_deals(current_time)
                 last_deal_check = current_time
             
-            # Perform full history check every 30 seconds to catch any missed trades
-            if (current_time - last_full_history_check).total_seconds() >= 30:
+            # Reduced full history check to every 60 seconds (less frequent due to faster deal detection)
+            if (current_time - last_full_history_check).total_seconds() >= 60:
                 check_full_recent_history(current_time)
                 last_full_history_check = current_time
             
@@ -586,9 +586,9 @@ def background_trade_monitor():
                     old_current_price = float(getattr(old_pos, 'price_current', 0))
                     new_current_price = float(getattr(pos, 'price_current', 0))
                     
-                    # Check for profit change or price change (more sensitive for real-time updates)
-                    profit_changed = abs(old_profit - new_profit) > 0.005  # Reduced threshold for more updates
-                    price_changed = abs(old_current_price - new_current_price) > 0.00001  # More sensitive
+                    # Check for profit change or price change (ultra-sensitive for real-time updates)
+                    profit_changed = abs(old_profit - new_profit) > 0.001  # Ultra-sensitive threshold
+                    price_changed = abs(old_current_price - new_current_price) > 0.000001  # Maximum sensitivity
                     
                     if profit_changed or price_changed:
                         trade_data = format_position_data(pos, is_new=False)
@@ -602,21 +602,55 @@ def background_trade_monitor():
                             # Emit account summary update for any profit changes
                             emit_account_summary_update()
             
-            # Check for closed positions with improved detection
+            # Check for closed positions with immediate processing
             closed_positions = []
             for ticket in list(last_known_positions.keys()):
                 if ticket not in current_positions_dict:
                     closed_positions.append(ticket)
             
-            # Process closed positions with enhanced deal lookup
+            # Process closed positions immediately with real-time updates
             if closed_positions:
                 log.info(f"Detected {len(closed_positions)} closed positions: {closed_positions}")
+                # Process each closed position immediately with enhanced data
+                for ticket in closed_positions:
+                    if ticket in last_known_positions:
+                        # Try to find the most recent deal for this position for accurate data
+                        closing_deal = None
+                        try:
+                            recent_deals = mt5.history_deals_get(current_time - timedelta(minutes=1), current_time)
+                            if recent_deals:
+                                for deal in recent_deals:
+                                    if (getattr(deal, 'position_id', 0) == ticket and 
+                                        getattr(deal, 'type', -1) in [0, 1]):
+                                        closing_deal = deal
+                                        break
+                        except:
+                            pass
+                        
+                        # Format with the best available data
+                        if closing_deal:
+                            closed_trade_data = format_closed_trade_data(last_known_positions[ticket], closing_deal)
+                        else:
+                            closed_trade_data = format_basic_closed_trade(last_known_positions[ticket])
+                        
+                        if closed_trade_data:
+                            socketio.emit('trade_update', {
+                                'type': 'position_closed',
+                                'data': closed_trade_data,
+                                'timestamp': datetime.now().isoformat()
+                            })
+                            log.info(f"Immediately emitted position_closed for ticket {ticket} with {('complete' if closing_deal else 'basic')} data")
+                            
+                            # Emit account summary update
+                            emit_account_summary_update()
+                
+                # Also run enhanced deal lookup in background
                 process_closed_positions(closed_positions, current_time)
             
             # Update last known positions
             last_known_positions = current_positions_dict
             
-            socketio.sleep(0.5)  # Check every 500ms for faster response
+            socketio.sleep(0.25)  # Check every 250ms for ultra-fast response
             
         except Exception as e:
             log.error(f"Error in trade monitor: {e}", exc_info=True)
@@ -627,8 +661,8 @@ def check_for_new_deals(current_time):
     global last_known_deals
     
     try:
-        # Look back 5 minutes for new deals for better detection
-        date_from = current_time - timedelta(minutes=5)
+        # Look back 3 minutes for new deals - optimized for speed and accuracy
+        date_from = current_time - timedelta(minutes=3)
         date_to = current_time
         
         deals = mt5.history_deals_get(date_from, date_to)
@@ -670,11 +704,8 @@ def check_for_new_deals(current_time):
                             # Emit account summary update
                             emit_account_summary_update()
                             
-                            # Also emit a signal to refresh trade history for all clients
-                            socketio.emit('refresh_trade_history', {
-                                'reason': 'new_closed_trade',
-                                'timestamp': datetime.now().isoformat()
-                            })
+                            # Skip refresh signal - rely on real-time trade_update events instead
+                            # socketio.emit('refresh_trade_history', ...)
                     except Exception as e:
                         log.error(f"Error processing fast-detected closed trade: {e}")
                 else:
@@ -696,12 +727,12 @@ def check_for_new_deals(current_time):
         log.error(f"Error in enhanced deal monitoring: {e}")
 
 def check_immediate_deals(current_time):
-    """Check for very recent deals (last 2 minutes) for immediate detection"""
+    """Check for very recent deals (last 1 minute) for immediate detection"""
     global last_known_deals
     
     try:
-        # Look back 2 minutes for immediate detection (increased from 30 seconds)
-        date_from = current_time - timedelta(minutes=2)
+        # Look back 1 minute for immediate detection - optimized for speed
+        date_from = current_time - timedelta(minutes=1)
         date_to = current_time
         
         deals = mt5.history_deals_get(date_from, date_to)
@@ -725,12 +756,8 @@ def check_immediate_deals(current_time):
                 
                 log.info(f"IMMEDIATE: New deal detected - Ticket: {deal_ticket}, Position: {deal_position_id}")
                 
-                # Always emit refresh signal for immediate deals
-                socketio.emit('refresh_trade_history', {
-                    'reason': 'immediate_new_deal',
-                    'deal_ticket': deal_ticket,
-                    'timestamp': datetime.now().isoformat()
-                })
+                # Skip refresh signal for immediate deals - rely on trade_update events instead
+                # socketio.emit('refresh_trade_history', ...)
                 
                 # Check if this is a closing deal for a position we were tracking
                 if deal_position_id in last_known_positions:
@@ -754,11 +781,8 @@ def check_immediate_deals(current_time):
                             # Emit account summary update
                             emit_account_summary_update()
                             
-                            # Emit refresh signal for immediate UI update
-                            socketio.emit('refresh_trade_history', {
-                                'reason': 'immediate_closed_trade',
-                                'timestamp': datetime.now().isoformat()
-                            })
+                            # Skip refresh signal - real-time trade_update is sufficient
+                            # socketio.emit('refresh_trade_history', ...)
                     except Exception as e:
                         log.error(f"Error processing immediate closed trade: {e}")
                 else:
@@ -805,12 +829,9 @@ def check_full_recent_history(current_time):
                 new_deals_count += 1
         
         if new_deals_count > 0:
-            log.info(f"Full history check found {new_deals_count} new deals, triggering refresh")
-            socketio.emit('refresh_trade_history', {
-                'reason': 'periodic_full_check',
-                'new_deals': new_deals_count,
-                'timestamp': datetime.now().isoformat()
-            })
+            log.info(f"Full history check found {new_deals_count} new deals")
+            # Skip refresh signal - deals should be caught by real-time monitoring
+            # Focus on account summary update only
             emit_account_summary_update()
             
     except Exception as e:

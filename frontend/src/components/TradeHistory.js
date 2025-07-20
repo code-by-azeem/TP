@@ -113,14 +113,14 @@ const TradeHistory = ({ socket }) => {
     setLastUpdate(new Date());
 
     if (data.type === 'position_opened' && data.data) {
-      // Add new position to the list
+      // Add new position to the list with real-time handling
       setTrades(prevTrades => {
         // Check if trade already exists to avoid duplicates
         const existingIndex = prevTrades.findIndex(t => t.id === data.data.id || t.ticket === data.data.ticket);
         if (existingIndex >= 0) {
           // Update existing trade with new status
           const newTrades = [...prevTrades];
-          newTrades[existingIndex] = { ...data.data, isNew: true };
+          newTrades[existingIndex] = { ...data.data, isNew: true, isUpdated: true };
           return newTrades;
         } else {
           // Add new trade at the beginning with proper sorting
@@ -130,10 +130,10 @@ const TradeHistory = ({ socket }) => {
         }
       });
       
-      // Update account summary for new position
+      // Update account summary for new position - no delays
       fetchAccountSummary();
     } else if (data.type === 'position_updated' && data.data) {
-      // Update existing position with live P/L changes
+      // Update existing position with live P/L changes - real-time responsive
       setTrades(prevTrades => {
         const newTrades = prevTrades.map(trade => {
           if (trade.id === data.data.id || trade.ticket === data.data.ticket) {
@@ -143,41 +143,51 @@ const TradeHistory = ({ socket }) => {
               isUpdated: true,
               // Preserve visual indicators if they exist
               isNew: trade.isNew,
-              justClosed: trade.justClosed
+              justClosed: trade.justClosed,
+              // Add timestamp of update for tracking
+              lastUpdateTime: new Date().toISOString()
             };
           }
           return trade;
         });
         return newTrades;
       });
+      
+      // Update account summary immediately for profit changes
+      fetchAccountSummary();
     } else if (data.type === 'position_closed' && data.data) {
-      // Handle closed position - ensure smooth transition from open to closed
+      // Handle closed position - immediate real-time processing
       setTrades(prevTrades => {
         const existingIndex = prevTrades.findIndex(t => t.id === data.data.id || t.ticket === data.data.ticket);
         if (existingIndex >= 0) {
-          // Update existing trade to closed status
+          // Update existing trade to closed status with complete data
           const newTrades = [...prevTrades];
           newTrades[existingIndex] = { 
-            ...data.data, 
+            ...newTrades[existingIndex], // Preserve existing data
+            ...data.data, // Apply new closed data
             justClosed: true,
-            is_open: false // Ensure it's marked as closed
+            is_open: false, // Ensure it's marked as closed
+            closedTime: new Date().toISOString() // Track when it was closed in UI
           };
           // Resort the list to maintain timestamp order
           return newTrades.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
         } else {
           // Add new closed trade if it wasn't in the list
-          const newTradesList = [{ ...data.data, justClosed: true, is_open: false }, ...prevTrades];
+          const newTradesList = [{ 
+            ...data.data, 
+            justClosed: true, 
+            is_open: false,
+            closedTime: new Date().toISOString()
+          }, ...prevTrades];
           return newTradesList.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
         }
       });
       
-      // For position closed, also trigger a force refresh to ensure statistics are correct
-      setTimeout(() => {
-        console.log('Position closed - triggering force refresh for updated statistics');
-        forceRefresh();
-      }, 1000);
+      // Immediate account summary update for closed positions
+      console.log('Position closed - immediate account summary update');
+      fetchAccountSummary();
     }
-  }, [forceRefresh, fetchAccountSummary]);
+  }, [fetchAccountSummary]);
 
   // Handle account updates from WebSocket
   const handleAccountUpdate = useCallback((accountUpdate) => {
@@ -202,29 +212,23 @@ const TradeHistory = ({ socket }) => {
       socket.on('trade_update', handleTradeUpdate);
       socket.on('account_update', handleAccountUpdate);
       
-      // Listen for refresh signals from backend
+      // Listen for refresh signals from backend - only for critical updates
       socket.on('refresh_trade_history', (data) => {
         console.log('Received refresh signal:', data);
-        if (data.reason === 'immediate_closed_trade' || data.reason === 'immediate_unknown_deal' || data.reason === 'immediate_new_deal') {
-          // For immediate signals, use force refresh
-          forceRefresh();
-        } else {
+        // Only refresh for truly unknown deals that weren't caught by real-time updates
+        if (data.reason === 'immediate_unknown_deal' || data.reason === 'manual_force_refresh') {
+          console.log('Refreshing for critical signal:', data.reason);
           fetchTradeHistory();
         }
+        // Skip refresh for other signals - rely on real-time trade_update events instead
       });
       
-      // Set up periodic refresh to catch any missed trades
-      const refreshInterval = setInterval(() => {
-        fetchTradeHistory();
-      }, 60000); // Refresh every 60 seconds (less frequent due to improved real-time updates)
-      
-      // Clean up listener and interval on unmount
+      // Clean up listener on unmount - NO periodic refresh intervals
       return () => {
         console.log('Cleaning up trade update listener');
         socket.off('trade_update', handleTradeUpdate);
         socket.off('account_update', handleAccountUpdate);
         socket.off('refresh_trade_history');
-        clearInterval(refreshInterval);
       };
     }
   }, [socket, handleTradeUpdate, handleAccountUpdate, fetchTradeHistory, forceRefresh]);
@@ -245,18 +249,8 @@ const TradeHistory = ({ socket }) => {
     return () => clearTimeout(timer);
   }, [trades]);
 
-  // Periodic refresh to ensure data consistency
-  useEffect(() => {
-    const refreshInterval = setInterval(() => {
-      // Only refresh if there are no recent updates to avoid conflicts
-      const timeSinceLastUpdate = lastUpdate ? new Date() - lastUpdate : Infinity;
-      if (timeSinceLastUpdate > 60000) { // 60 seconds since last update
-        fetchTradeHistory();
-      }
-    }, 120000); // Check every 2 minutes
-
-    return () => clearInterval(refreshInterval);
-  }, [lastUpdate, fetchTradeHistory]);
+  // Removed periodic refresh - relying on real-time WebSocket updates only
+  // No automatic refresh intervals to prevent unwanted page refreshes
 
   // Format currency with 2 decimal places
   const formatCurrency = (value) => {

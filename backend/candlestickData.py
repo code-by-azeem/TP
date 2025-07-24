@@ -2579,11 +2579,19 @@ def handle_bot_start(data):
     """Handle bot start request via WebSocket"""
     try:
         strategy = data.get('strategy', 'default') if data else 'default'
+        config = data.get('config', {}) if data else {}
+        
+        # Update bot configuration first
+        if config:
+            log.info(f"Updating bot config before start: {config}")
+            bot_manager.update_config(config)
+        
         success = bot_manager.start_bot(strategy)
         
         socketio.emit('bot_start_response', {
             'success': success,
             'strategy': strategy,
+            'config': bot_manager.config,
             'timestamp': datetime.now().isoformat()
         }, room=request.sid)
         
@@ -2617,7 +2625,9 @@ def handle_bot_config_update(data):
     """Handle bot configuration update via WebSocket"""
     try:
         if data:
+            log.info(f"🔧 Updating bot config via WebSocket: {data}")
             bot_manager.update_config(data)
+            log.info(f"✅ Bot config updated successfully. New config: {bot_manager.config}")
             
         socketio.emit('bot_config_response', {
             'success': True,
@@ -2626,7 +2636,7 @@ def handle_bot_config_update(data):
         }, room=request.sid)
         
     except Exception as e:
-        log.error(f"Error in bot_config_update handler: {e}")
+        log.error(f"❌ Error in bot_config_update handler: {e}")
         socketio.emit('bot_error', {
             'error': str(e),
             'timestamp': datetime.now().isoformat()

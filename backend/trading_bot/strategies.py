@@ -137,6 +137,15 @@ class RSIStrategy(BaseStrategy):
             
             rsi = self.calculate_rsi(close_prices)
             
+            # Always log current RSI status for debugging
+            if rsi < self.oversold:
+                status = f"OVERSOLD ({rsi:.1f} < {self.oversold})"
+            elif rsi > self.overbought:
+                status = f"OVERBOUGHT ({rsi:.1f} > {self.overbought})"
+            else:
+                status = f"NEUTRAL ({rsi:.1f})"
+            log.info(f"📊 RSI Status: {status}")
+            
             signal = None
             
             # Oversold condition - potential buy signal
@@ -149,6 +158,7 @@ class RSIStrategy(BaseStrategy):
                     'rsi': rsi,
                     'reason': f'RSI Oversold ({rsi:.2f})'
                 }
+                log.info(f"🚀 RSI BUY: RSI {rsi:.1f} is oversold (< {self.oversold})")
             
             # Overbought condition - potential sell signal
             elif rsi > self.overbought:
@@ -160,6 +170,15 @@ class RSIStrategy(BaseStrategy):
                     'rsi': rsi,
                     'reason': f'RSI Overbought ({rsi:.2f})'
                 }
+                log.info(f"🔻 RSI SELL: RSI {rsi:.1f} is overbought (> {self.overbought})")
+            else:
+                # Show how far from signal levels
+                distance_to_oversold = rsi - self.oversold
+                distance_to_overbought = self.overbought - rsi
+                if distance_to_oversold < distance_to_overbought:
+                    log.info(f"📊 RSI: {rsi:.1f} is {distance_to_oversold:.1f} points away from oversold ({self.oversold})")
+                else:
+                    log.info(f"📊 RSI: {rsi:.1f} is {distance_to_overbought:.1f} points away from overbought ({self.overbought})")
             
             return signal
             
@@ -399,6 +418,10 @@ class BollingerBandsStrategy(BaseStrategy):
             upper_band = sma + (self.std_dev * std)
             lower_band = sma - (self.std_dev * std)
             
+            # Always log current Bollinger status for debugging
+            position_pct = ((current_price - lower_band) / (upper_band - lower_band)) * 100
+            log.info(f"📊 BB Status: Price={current_price:.2f}, Upper={upper_band:.2f}, Lower={lower_band:.2f}, Position={position_pct:.1f}%")
+            
             signal = None
             
             # Price touching lower band = BUY signal (oversold)
@@ -428,6 +451,14 @@ class BollingerBandsStrategy(BaseStrategy):
                     'reason': f'Price at upper band ({upper_band:.2f})'
                 }
                 log.info(f"📈 BOLLINGER SELL: Price {current_price:.2f} at upper band {upper_band:.2f}")
+            else:
+                # Show why no signal was generated
+                if position_pct < 25:
+                    log.info(f"📊 BB: Price near lower band ({position_pct:.1f}%) but not touching - waiting...")
+                elif position_pct > 75:
+                    log.info(f"📊 BB: Price near upper band ({position_pct:.1f}%) but not touching - waiting...")
+                else:
+                    log.info(f"📊 BB: Price in middle range ({position_pct:.1f}%) - no signal")
             
             return signal
             

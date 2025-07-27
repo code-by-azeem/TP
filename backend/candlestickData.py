@@ -22,7 +22,13 @@ import random
 from collections import Counter # Added for logging client counts by timeframe
 
 # Import trading bot
-from trading_bot.bot_manager import bot_manager
+from trading_bot.bot_manager import TradingBotManager
+
+# Global bot managers dictionary
+bot_managers = {}  # bot_id -> TradingBotManager instance
+
+# Global bot manager for backward compatibility with existing APIs
+bot_manager = TradingBotManager()
 
 # --- Configuration ---
 load_dotenv()
@@ -945,7 +951,7 @@ def emit_account_summary_update():
         log.error(f"Error emitting account summary update: {e}")
 
 def format_position_data(position, is_new=False):
-    """Format MT5 position data for frontend"""
+    """Format MT5 position data for frontend with bot attribution"""
     try:
         position_type = "BUY" if getattr(position, 'type', 0) == 0 else "SELL"
         open_time = datetime.fromtimestamp(position.time) if hasattr(position, 'time') else datetime.now()
@@ -968,7 +974,12 @@ def format_position_data(position, is_new=False):
             else:  # SELL
                 change_percent = ((open_price - current_price) / open_price) * 100
         
-        return {
+        # Determine bot attribution
+        magic_number = getattr(position, 'magic', 0)
+        comment = getattr(position, 'comment', '')
+        bot_info = _determine_bot_attribution(magic_number, comment)
+        
+        trade_data = {
             "id": int(getattr(position, 'ticket', 0)),
             "ticket": int(getattr(position, 'ticket', 0)),
             "timestamp": open_time.isoformat(),
@@ -986,16 +997,23 @@ def format_position_data(position, is_new=False):
             "commission": commission,
             "swap": swap,
             "change_percent": change_percent,
-            "comment": getattr(position, 'comment', ''),
+            "comment": comment,
+            "magic": magic_number,
             "is_open": True,
-            "is_new": is_new
+            "is_new": is_new,
+            # BOT ATTRIBUTION
+            "bot_id": bot_info['bot_id'] if bot_info else None,
+            "bot_name": bot_info['bot_name'] if bot_info else None,
+            "is_bot_trade": bot_info is not None
         }
+        
+        return trade_data
     except Exception as e:
         log.error(f"Error formatting position data: {e}")
         return None
 
 def format_closed_trade_data(last_position, closing_deal):
-    """Format closed trade data combining position and deal info"""
+    """Format closed trade data combining position and deal info with bot attribution"""
     try:
         position_type = "BUY" if getattr(last_position, 'type', 0) == 0 else "SELL"
         open_time = datetime.fromtimestamp(last_position.time) if hasattr(last_position, 'time') else datetime.now()
@@ -1019,7 +1037,12 @@ def format_closed_trade_data(last_position, closing_deal):
             else:  # SELL
                 change_percent = ((open_price - close_price) / open_price) * 100
         
-        return {
+        # Determine bot attribution (prioritize position data, fallback to deal data)
+        magic_number = getattr(last_position, 'magic', 0) or getattr(closing_deal, 'magic', 0)
+        comment = getattr(last_position, 'comment', '') or getattr(closing_deal, 'comment', '')
+        bot_info = _determine_bot_attribution(magic_number, comment)
+        
+        trade_data = {
             "id": int(getattr(last_position, 'ticket', 0)),
             "ticket": int(getattr(last_position, 'ticket', 0)),
             "timestamp": open_time.isoformat(),
@@ -1039,12 +1062,67 @@ def format_closed_trade_data(last_position, closing_deal):
             "commission": commission,
             "swap": swap,
             "change_percent": change_percent,
-            "comment": getattr(last_position, 'comment', ''),
+            "comment": comment,
+            "magic": magic_number,
             "is_open": False,
-            "just_closed": True
+            "just_closed": True,
+            # BOT ATTRIBUTION
+            "bot_id": bot_info['bot_id'] if bot_info else None,
+            "bot_name": bot_info['bot_name'] if bot_info else None,
+            "is_bot_trade": bot_info is not None
         }
+        
+        return trade_data
     except Exception as e:
         log.error(f"Error formatting closed trade data: {e}")
+        return None
+
+def _determine_bot_attribution(magic_number, comment):
+    """Determine bot attribution based on magic number and comment"""
+    try:
+        # Method 1: Check active bot managers by magic number
+        for bot_id, bot_manager in bot_managers.items():
+            if hasattr(bot_manager, 'unique_magic_number') and bot_manager.unique_magic_number == magic_number:
+                return {
+                    'bot_id': bot_id,
+                    'bot_name': f"Bot {bot_id.split('_')[-1] if '_' in bot_id else bot_id}",
+                    'magic_number': magic_number
+                }
+        
+        # Method 2: Extract from comment pattern
+        if 'TradePulse' in comment:
+            if '_bot_' in comment:
+                try:
+                    bot_id_part = comment.split('_bot_')[1].split('_')[0]
+                    return {
+                        'bot_id': f"bot_{bot_id_part}",
+                        'bot_name': f"Bot {bot_id_part}",
+                        'magic_number': magic_number
+                    }
+                except:
+                    pass
+            
+            # Generic TradePulse trade
+            if magic_number >= 234000 and magic_number <= 300000:
+                return {
+                    'bot_id': 'unknown',
+                    'bot_name': 'TradePulse Bot',
+                    'magic_number': magic_number
+                }
+        
+        # Method 3: Magic number range check for TradePulse trades
+        if magic_number >= 234000 and magic_number <= 300000:
+            return {
+                'bot_id': 'unknown',
+                'bot_name': 'TradePulse Bot',
+                'magic_number': magic_number
+            }
+        
+        # Not a bot trade
+        return None
+        
+    except Exception as e:
+        log.error(f"Error determining bot attribution: {e}")
         return None
 
 def format_basic_closed_trade(last_position):
@@ -1363,6 +1441,99 @@ def get_account_summary():
     except Exception as e:
         log.error(f"Error generating account summary: {e}", exc_info=True)
         return jsonify({"error": "Failed to generate account summary"}), 500
+
+@app.route('/bot-details/<bot_id>')
+def get_bot_details(bot_id):
+    """Get detailed performance metrics for a specific bot"""
+    log.info(f"Received request for bot details: {bot_id}")
+    
+    # Simple session check for web app access
+    if 'username' not in session:
+        log.warning("Unauthorized bot details request - please login first")
+        return jsonify({"error": "Please login to access bot details"}), 401
+    
+    try:
+        # Find the specific bot manager
+        bot_manager = bot_managers.get(bot_id)
+        if not bot_manager:
+            log.warning(f"Bot {bot_id} not found in active bots")
+            return jsonify({"error": f"Bot {bot_id} not found"}), 404
+        
+        # Get bot's performance data
+        bot_status = bot_manager.get_bot_status()
+        
+        # Get bot's trade history
+        bot_trade_history = bot_manager.get_trade_history()
+        
+        # Get bot's open positions specifically
+        bot_positions = []
+        if mt5.initialize():
+            open_positions = mt5.positions_get()
+            if open_positions:
+                for pos in open_positions:
+                    pos_magic = getattr(pos, 'magic', 0)
+                    pos_comment = getattr(pos, 'comment', '')
+                    
+                    # Use same strict filtering as bot manager
+                    belongs_to_bot = (
+                        pos_magic == bot_manager.unique_magic_number or 
+                        (f"TradePulse_{bot_id}" in pos_comment and pos_magic >= 234000)
+                    )
+                    
+                    if belongs_to_bot:
+                        bot_positions.append({
+                            'ticket': getattr(pos, 'ticket', 0),
+                            'symbol': getattr(pos, 'symbol', ''),
+                            'type': 'BUY' if getattr(pos, 'type', 0) == 0 else 'SELL',
+                            'volume': getattr(pos, 'volume', 0),
+                            'price_open': getattr(pos, 'price_open', 0),
+                            'price_current': getattr(pos, 'price_current', 0),
+                            'profit': getattr(pos, 'profit', 0),
+                            'swap': getattr(pos, 'swap', 0),
+                            'commission': getattr(pos, 'commission', 0),
+                            'time': getattr(pos, 'time', 0)
+                        })
+        
+        # Calculate comprehensive metrics
+        performance = bot_status['performance']
+        recent_trades = bot_trade_history[:10]  # Last 10 trades
+        
+        detailed_response = {
+            "success": True,
+            "bot_id": bot_id,
+            "bot_details": {
+                "status": "running" if bot_status['is_running'] else "stopped",
+                "strategy": bot_status['strategy'],
+                "auto_trading": bot_status['auto_trading'],
+                "magic_number": bot_status['magic_number'],
+                "start_time": bot_status['bot_start_time'],
+                "performance": {
+                    "total_trades": performance.get('total_trades', 0),
+                    "active_trades": len(bot_positions),
+                    "win_rate": performance.get('win_rate', 0),
+                    "winning_trades": performance.get('winning_trades', 0),
+                    "losing_trades": performance.get('losing_trades', 0),
+                    "realized_pnl": performance.get('total_profit', 0),
+                    "unrealized_pnl": performance.get('unrealized_pnl', 0),
+                    "total_pnl": performance.get('total_pnl', 0),
+                    "daily_pnl": performance.get('daily_pnl', 0),
+                    "max_drawdown": performance.get('max_drawdown', 0)
+                },
+                "open_positions": bot_positions,
+                "recent_trades": recent_trades[:10],
+                "config": bot_status.get('config', {})
+            }
+        }
+        
+        log.info(f"Bot {bot_id} details: {performance.get('total_trades', 0)} trades, "
+                f"{performance.get('win_rate', 0):.1f}% win rate, "
+                f"${performance.get('total_pnl', 0):.2f} total P&L")
+        
+        return jsonify(detailed_response), 200
+        
+    except Exception as e:
+        log.error(f"Error getting bot details for {bot_id}: {e}", exc_info=True)
+        return jsonify({"success": False, "error": str(e)}), 500
 
 @app.route('/realized-profit')
 def get_realized_profit():
@@ -1856,7 +2027,8 @@ def get_account():
 # --- MT5 Trade History endpoint - Returns data from connected MT5 account ---
 @app.route('/trade-history', methods=['GET'])
 def get_trade_history():
-    log.info("Received request for MT5 trade history")
+    """Get comprehensive trade history including bot-specific trades"""
+    log.info("Received request for MT5 trade history with bot attribution")
     
     # Simple session check for web app access
     if 'username' not in session:
@@ -1878,31 +2050,25 @@ def get_trade_history():
         # Get historical deals (completed trades) using history_deals_get
         deals = []
         try:
+            # First, get the main historical deals
             deals = mt5.history_deals_get(date_from, date_to)
             if deals is None:
                 log.warning(f"No deals returned from MT5: {mt5.last_error()}")
-                # Try alternative approach - get today's deals separately
-                today_start = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
-                today_deals = mt5.history_deals_get(today_start, datetime.now())
-                if today_deals:
-                    deals = list(today_deals)
-                    log.info(f"Retrieved {len(deals)} today's deals as fallback")
-                else:
-                    deals = []
+                deals = []
             else:
                 log.info(f"Retrieved {len(deals)} historical deals from {date_from.date()} to {date_to.date()}")
                 
-                # Also fetch today's deals separately to ensure we have the latest
-                today_start = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
-                today_deals = mt5.history_deals_get(today_start, datetime.now())
-                if today_deals:
-                    # Combine with existing deals, avoiding duplicates
-                    existing_tickets = {getattr(d, 'ticket', 0) for d in deals}
-                    new_deals = [d for d in today_deals if getattr(d, 'ticket', 0) not in existing_tickets]
-                    if new_deals:
-                        deals.extend(new_deals)
-                        log.info(f"Added {len(new_deals)} additional today's deals")
-                        
+            # CRITICAL: Also get very recent deals (last 10 minutes) to catch fresh bot trades
+            recent_time = datetime.now() - timedelta(minutes=10)
+            recent_deals = mt5.history_deals_get(recent_time, datetime.now())
+            if recent_deals:
+                # Merge recent deals, avoiding duplicates
+                existing_tickets = {getattr(d, 'ticket', 0) for d in deals}
+                new_recent_deals = [d for d in recent_deals if getattr(d, 'ticket', 0) not in existing_tickets]
+                if new_recent_deals:
+                    deals = list(deals) + list(new_recent_deals)
+                    log.info(f"Added {len(new_recent_deals)} very recent deals to ensure fresh bot trades are included")
+                    
         except Exception as e:
             log.error(f"Error fetching deals: {e}", exc_info=True)
             deals = []
@@ -1918,10 +2084,36 @@ def get_trade_history():
             log.error(f"Error fetching open positions: {e}")
             current_positions = []
         
-        # Group deals by position to get complete trades
-        # Process deals to create closed trades
+        # Collect bot trade data from active bot managers
+        bot_trade_data = {}
+        for bot_id, bot_manager in bot_managers.items():
+            try:
+                # Get bot's completed trade history
+                bot_completed_trades = bot_manager.lifetime_stats.get('completed_trade_history', [])
+                for trade in bot_completed_trades:
+                    ticket = trade.get('ticket', 0)
+                    if ticket:
+                        bot_trade_data[ticket] = {
+                            'bot_id': bot_id,
+                            'bot_name': f"Bot {bot_id.split('_')[-1] if '_' in bot_id else bot_id}",
+                            'magic_number': trade.get('magic_number', 0)
+                        }
+                
+                # Get bot's magic number for position attribution
+                if hasattr(bot_manager, 'unique_magic_number') and bot_manager.unique_magic_number:
+                    magic = bot_manager.unique_magic_number
+                    bot_trade_data[f"magic_{magic}"] = {
+                        'bot_id': bot_id,
+                        'bot_name': f"Bot {bot_id.split('_')[-1] if '_' in bot_id else bot_id}",
+                        'magic_number': magic
+                    }
+                    
+            except Exception as e:
+                log.error(f"Error collecting data from bot {bot_id}: {e}")
+        
+        # Group deals by position to create closed trades
         closed_trades = []
-        open_trades = []  # Initialize open_trades list
+        open_trades = []
         deal_groups = {}
         
         # Group deals by position_id to form complete trades
@@ -1942,36 +2134,30 @@ def get_trade_history():
                 log.error(f"Error processing deal {getattr(deal, 'ticket', 'unknown')}: {e}")
                 continue
         
-        # Convert deal groups to trades - improved logic
+        # Convert deal groups to trades with bot attribution
         for position_id, position_deals in deal_groups.items():
             try:
                 # Sort deals by time
                 position_deals.sort(key=lambda d: getattr(d, 'time', 0))
                 
-                # We need at least one deal to create a trade record
                 if len(position_deals) == 0:
                     continue
                 
                 # Find entry and exit deals
-                entry_deal = None
+                entry_deal = position_deals[0]
                 exit_deal = None
                 
-                # The first deal is typically the entry
-                entry_deal = position_deals[0]
-                
-                # If we have multiple deals, the last one might be the exit
                 if len(position_deals) > 1:
                     exit_deal = position_deals[-1]
                     
-                    # Verify this is actually a closing deal by checking if it's the opposite type
+                    # Verify this is actually a closing deal
                     entry_type = getattr(entry_deal, 'type', -1)
                     exit_type = getattr(exit_deal, 'type', -1)
                     
-                    # If they're the same type, it's not a closing deal
                     if entry_type == exit_type:
                         exit_deal = None
                 
-                # Calculate total profit, commission, and swap from ALL deals in this position
+                # Calculate total profit, commission, and swap
                 total_profit = 0.0
                 total_commission = 0.0
                 total_swap = 0.0
@@ -1985,17 +2171,47 @@ def get_trade_history():
                 
                 # Determine trade type from entry deal
                 entry_type = getattr(entry_deal, 'type', 0)
-                if entry_type == 0:  # DEAL_TYPE_BUY
-                    trade_type = "BUY"
-                elif entry_type == 1:  # DEAL_TYPE_SELL
-                    trade_type = "SELL"
-                else:
-                    # Skip non-trade deals
-                    continue
+                trade_type = "BUY" if entry_type == 0 else "SELL"
                 
                 # Get trade details
                 symbol = getattr(entry_deal, 'symbol', '')
                 entry_price = float(getattr(entry_deal, 'price', 0))
+                magic_number = getattr(entry_deal, 'magic', 0)
+                comment = getattr(entry_deal, 'comment', '')
+                entry_ticket = getattr(entry_deal, 'ticket', 0)
+                
+                # Determine bot attribution
+                bot_info = None
+                
+                # Try to find bot by ticket
+                if entry_ticket in bot_trade_data:
+                    bot_info = bot_trade_data[entry_ticket]
+                # Try to find bot by magic number
+                elif f"magic_{magic_number}" in bot_trade_data:
+                    bot_info = bot_trade_data[f"magic_{magic_number}"]
+                # Try to find bot by comment
+                elif 'TradePulse' in comment:
+                    # Extract bot info from comment
+                    if '_bot_' in comment:
+                        try:
+                            bot_id_part = comment.split('_bot_')[1].split('_')[0]
+                            bot_info = {
+                                'bot_id': f"bot_{bot_id_part}",
+                                'bot_name': f"Bot {bot_id_part}",
+                                'magic_number': magic_number
+                            }
+                        except:
+                            bot_info = {
+                                'bot_id': 'unknown',
+                                'bot_name': 'TradePulse Bot',
+                                'magic_number': magic_number
+                            }
+                    else:
+                        bot_info = {
+                            'bot_id': 'unknown',
+                            'bot_name': 'TradePulse Bot',
+                            'magic_number': magic_number
+                        }
                 
                 # Determine if trade is closed
                 is_closed = exit_deal is not None
@@ -2013,7 +2229,7 @@ def get_trade_history():
                         else:  # SELL
                             change_percent = ((entry_price - exit_price) / entry_price) * 100
                     
-                    # Create closed trade data
+                    # Create closed trade data with bot attribution
                     trade_data = {
                         "id": int(position_id),
                         "ticket": int(position_id),
@@ -2027,84 +2243,34 @@ def get_trade_history():
                         "entry_price": entry_price,
                         "exit_price": exit_price,
                         "current_price": exit_price,
-                        "sl": 0.0,  # SL/TP not available in deals
+                        "sl": 0.0,
                         "tp": 0.0,
                         "profit": total_profit + total_commission + total_swap,
                         "raw_profit": total_profit,
                         "commission": total_commission,
                         "swap": total_swap,
                         "change_percent": change_percent,
-                        "comment": getattr(entry_deal, 'comment', ''),
+                        "comment": comment,
+                        "magic": magic_number,
                         "identifier": position_id,
-                        "reason": getattr(exit_deal, 'reason', None) if exit_deal else None,
-                        "is_open": False
+                        "is_open": False,
+                        # BOT ATTRIBUTION
+                        "bot_id": bot_info['bot_id'] if bot_info else None,
+                        "bot_name": bot_info['bot_name'] if bot_info else None,
+                        "is_bot_trade": bot_info is not None
                     }
                     
                     closed_trades.append(trade_data)
-                    log.info(f"Processed closed trade {position_id}: {trade_type} {trade_data['volume']} {symbol} "
-                            f"entry: {entry_price}, exit: {exit_price}, profit: {total_profit:.2f}")
-                else:
-                    # This might be a partially filled position or a position that's still open
-                    # Check if it's in current positions
-                    is_in_current_positions = any(
-                        getattr(pos, 'ticket', 0) == position_id 
-                        for pos in current_positions
-                    )
-                    
-                    if not is_in_current_positions and len(position_deals) == 1:
-                        # Single deal that's not in current positions - might be a closed trade
-                        # where we only have the closing deal
-                        current_price = entry_price
-                        
-                        # Create a record for this trade
-                        trade_data = {
-                            "id": int(position_id),
-                            "ticket": int(position_id),
-                            "timestamp": datetime.fromtimestamp(getattr(entry_deal, 'time', 0)).isoformat(),
-                            "time": datetime.fromtimestamp(getattr(entry_deal, 'time', 0)).isoformat(),
-                            "close_time": datetime.fromtimestamp(getattr(entry_deal, 'time', 0)).isoformat(),
-                            "symbol": symbol,
-                            "type": trade_type,
-                            "volume": float(getattr(entry_deal, 'volume', 0)),
-                            "price": entry_price,
-                            "entry_price": entry_price,
-                            "exit_price": entry_price,
-                            "current_price": entry_price,
-                            "sl": 0.0,
-                            "tp": 0.0,
-                            "profit": total_profit + total_commission + total_swap,
-                            "raw_profit": total_profit,
-                            "commission": total_commission,
-                            "swap": total_swap,
-                            "change_percent": 0.0,
-                            "comment": getattr(entry_deal, 'comment', ''),
-                            "identifier": position_id,
-                            "reason": getattr(entry_deal, 'reason', None),
-                            "is_open": False,
-                            "single_deal": True  # Flag to indicate this is from a single deal
-                        }
-                        
-                        if total_profit != 0:  # Only add if there's actual profit/loss
-                            closed_trades.append(trade_data)
-                            log.info(f"Added single-deal trade {position_id}: profit: {total_profit:.2f}")
                     
             except Exception as e:
-                log.error(f"Error processing position {position_id}: {e}", exc_info=True)
+                log.error(f"Error processing position {position_id}: {e}")
                 continue
         
-        # Convert current open positions to trade format
+        # Process current open positions with bot attribution
         for position in current_positions:
             try:
-                # Convert position type to readable format
-                # Check if constants are available
-                if hasattr(mt5, 'POSITION_TYPE_BUY'):
-                    position_type = "BUY" if position.type == mt5.POSITION_TYPE_BUY else "SELL"
-                else:
-                    # Fallback for older MT5 versions or missing constants
-                    position_type = "BUY" if getattr(position, 'type', 0) == 0 else "SELL"
-                
-                # Get position timestamps
-                open_time = datetime.fromtimestamp(position.time) if hasattr(position, 'time') else datetime.now()
+                position_type = "BUY" if getattr(position, 'type', 0) == 0 else "SELL"
+                open_time = datetime.fromtimestamp(getattr(position, 'time', 0))
                 
                 # Calculate real profit
                 real_profit = float(getattr(position, 'profit', 0))
@@ -2112,13 +2278,41 @@ def get_trade_history():
                 commission = float(getattr(position, 'commission', 0))
                 total_profit = real_profit + swap + commission
                 
-                # Get SL and TP
-                sl = float(getattr(position, 'sl', 0))
-                tp = float(getattr(position, 'tp', 0))
-                
-                # Get prices
+                # Get position details
                 open_price = float(getattr(position, 'price_open', 0))
                 current_price = float(getattr(position, 'price_current', open_price))
+                magic_number = getattr(position, 'magic', 0)
+                comment = getattr(position, 'comment', '')
+                ticket = int(getattr(position, 'ticket', 0))
+                
+                # Determine bot attribution for open position
+                bot_info = None
+                
+                # Try to find bot by magic number
+                if f"magic_{magic_number}" in bot_trade_data:
+                    bot_info = bot_trade_data[f"magic_{magic_number}"]
+                # Try to find bot by comment
+                elif 'TradePulse' in comment:
+                    if '_bot_' in comment:
+                        try:
+                            bot_id_part = comment.split('_bot_')[1].split('_')[0]
+                            bot_info = {
+                                'bot_id': f"bot_{bot_id_part}",
+                                'bot_name': f"Bot {bot_id_part}",
+                                'magic_number': magic_number
+                            }
+                        except:
+                            bot_info = {
+                                'bot_id': 'unknown',
+                                'bot_name': 'TradePulse Bot',
+                                'magic_number': magic_number
+                            }
+                    else:
+                        bot_info = {
+                            'bot_id': 'unknown',
+                            'bot_name': 'TradePulse Bot',
+                            'magic_number': magic_number
+                        }
                 
                 # Calculate percentage change
                 change_percent = 0.0
@@ -2128,71 +2322,52 @@ def get_trade_history():
                     else:  # SELL
                         change_percent = ((open_price - current_price) / open_price) * 100
                 
-                trade_data = {
-                    "id": int(getattr(position, 'ticket', 0)),
-                    "ticket": int(getattr(position, 'ticket', 0)),
+                open_trade_data = {
+                    "id": ticket,
+                    "ticket": ticket,
                     "timestamp": open_time.isoformat(),
                     "time": open_time.isoformat(),
-                    "close_time": None,
                     "symbol": getattr(position, 'symbol', ''),
                     "type": position_type,
                     "volume": float(getattr(position, 'volume', 0)),
                     "price": open_price,
                     "entry_price": open_price,
-                    "exit_price": current_price,
                     "current_price": current_price,
-                    "sl": sl,
-                    "tp": tp,
+                    "sl": float(getattr(position, 'sl', 0)),
+                    "tp": float(getattr(position, 'tp', 0)),
                     "profit": total_profit,
                     "raw_profit": real_profit,
                     "commission": commission,
                     "swap": swap,
                     "change_percent": change_percent,
-                    "comment": getattr(position, 'comment', ''),
-                    "identifier": getattr(position, 'identifier', None),
-                    "reason": None,
-                    "is_open": True
+                    "comment": comment,
+                    "magic": magic_number,
+                    "identifier": ticket,
+                    "is_open": True,
+                    # BOT ATTRIBUTION
+                    "bot_id": bot_info['bot_id'] if bot_info else None,
+                    "bot_name": bot_info['bot_name'] if bot_info else None,
+                    "is_bot_trade": bot_info is not None
                 }
                 
-                open_trades.append(trade_data)
-                log.info(f"Open Position {trade_data['ticket']}: {position_type} {trade_data['volume']} {trade_data['symbol']} "
-                        f"at {open_price}, current: {current_price}, profit: {total_profit:.2f}, change: {change_percent:.2f}%")
+                open_trades.append(open_trade_data)
                 
-            except Exception as position_error:
-                log.error(f"Error processing open position {getattr(position, 'ticket', 'unknown')}: {position_error}")
+            except Exception as e:
+                log.error(f"Error processing open position {getattr(position, 'ticket', 'unknown')}: {e}")
                 continue
         
-        # Combine all trades (closed + open)
+        # Combine all trades and sort by timestamp
         all_trades = closed_trades + open_trades
+        all_trades.sort(key=lambda x: x['timestamp'], reverse=True)
         
-        # Calculate summary statistics for logging
-        total_closed_trades = len(closed_trades)
-        total_open_trades = len(open_trades)
-        total_realized_pl = sum(t['profit'] for t in closed_trades)
-        total_unrealized_pl = sum(t['profit'] for t in open_trades)
-        
-        log.info(f"Trade processing summary: {total_closed_trades} closed trades, {total_open_trades} open positions")
-        log.info(f"Realized P/L: ${total_realized_pl:.2f}, Unrealized P/L: ${total_unrealized_pl:.2f}")
-        
-        if len(all_trades) == 0:
-            log.info("No trades found in MT5 account - returning empty list")
-            return jsonify([])
-        
-        # Sort trades by time (newest first)
-        try:
-            all_trades.sort(key=lambda x: x['timestamp'], reverse=True)
-        except Exception as sort_error:
-            log.error(f"Error sorting trades: {sort_error}")
-            # If sorting fails, return unsorted data
-        
-        log.info(f"Successfully retrieved {len(all_trades)} total trades from MT5 account")
-        log.info(f"Final breakdown - Closed trades: {len(closed_trades)}, Open positions: {len(open_trades)}")
+        log.info(f"Successfully processed {len(closed_trades)} closed trades and {len(open_trades)} open positions")
+        log.info(f"Bot trades found: {len([t for t in all_trades if t.get('is_bot_trade')])} out of {len(all_trades)} total")
         
         return jsonify(all_trades)
         
     except Exception as e:
-        log.error(f"Error fetching trade history: {e}", exc_info=True)
-        return jsonify({"error": "Failed to fetch trade history"}), 500
+        log.error(f"Error generating trade history: {e}", exc_info=True)
+        return jsonify({"error": "Failed to generate trade history"}), 500
 
 # --- SocketIO Event Handlers (Corrected Signatures) ---
 @socketio.on('check_connection')
@@ -2580,16 +2755,36 @@ def handle_bot_start(data):
     try:
         strategy = data.get('strategy', 'default') if data else 'default'
         config = data.get('config', {}) if data else {}
+        bot_id = data.get('bot_id') if data else None
+        
+        if not bot_id:
+            raise ValueError("bot_id is required")
+        
+        # Create new bot manager for this bot
+        if bot_id in bot_managers:
+            log.warning(f"Bot {bot_id} already exists, stopping existing bot first")
+            bot_managers[bot_id].stop_bot()
+        
+        # Create new bot manager
+        bot_manager = TradingBotManager()
+        bot_managers[bot_id] = bot_manager
+        
+        # Register callback to forward updates to frontend
+        def forward_updates(data):
+            socketio.emit('bot_update', data)
+        
+        bot_manager.register_update_callback(forward_updates)
         
         # Update bot configuration first
         if config:
-            log.info(f"Updating bot config before start: {config}")
+            log.info(f"Updating bot {bot_id} config before start: {config}")
             bot_manager.update_config(config)
         
-        success = bot_manager.start_bot(strategy)
+        success = bot_manager.start_bot(strategy, bot_id)
         
         socketio.emit('bot_start_response', {
             'success': success,
+            'bot_id': bot_id,
             'strategy': strategy,
             'config': bot_manager.config,
             'timestamp': datetime.now().isoformat()
@@ -2606,10 +2801,25 @@ def handle_bot_start(data):
 def handle_bot_stop(data):
     """Handle bot stop request via WebSocket"""
     try:
+        bot_id = data.get('bot_id') if data else None
+        
+        if not bot_id:
+            raise ValueError("bot_id is required")
+        
+        if bot_id not in bot_managers:
+            raise ValueError(f"Bot {bot_id} not found")
+        
+        bot_manager = bot_managers[bot_id]
         success = bot_manager.stop_bot()
+        
+        # Remove bot manager after stopping
+        if success:
+            del bot_managers[bot_id]
+            log.info(f"Bot {bot_id} stopped and removed")
         
         socketio.emit('bot_stop_response', {
             'success': success,
+            'bot_id': bot_id,
             'timestamp': datetime.now().isoformat()
         }, room=request.sid)
         
@@ -2638,6 +2848,119 @@ def handle_bot_config_update(data):
     except Exception as e:
         log.error(f"❌ Error in bot_config_update handler: {e}")
         socketio.emit('bot_error', {
+            'error': str(e),
+            'timestamp': datetime.now().isoformat()
+        }, room=request.sid)
+
+@socketio.on('get_bot_trade_history')
+def handle_get_bot_trade_history(data):
+    """Handle request for bot's trade history"""
+    try:
+        bot_id = data.get('bot_id') if data else None
+        
+        if not bot_id:
+            raise ValueError("bot_id is required")
+        
+        if bot_id not in bot_managers:
+            raise ValueError(f"Bot {bot_id} not found")
+        
+        bot_manager_instance = bot_managers[bot_id]
+        trade_history = bot_manager_instance.get_trade_history()
+        
+        socketio.emit('bot_trade_history_response', {
+            'success': True,
+            'bot_id': bot_id,
+            'trade_history': trade_history,
+            'timestamp': datetime.now().isoformat()
+        }, room=request.sid)
+        
+    except Exception as e:
+        log.error(f"❌ Error in get_bot_trade_history handler: {e}")
+        socketio.emit('bot_error', {
+            'error': str(e),
+            'timestamp': datetime.now().isoformat()
+        }, room=request.sid)
+
+@socketio.on('get_active_bots')
+def handle_get_active_bots():
+    """Handle request to get all active bots - used for page refresh restoration"""
+    try:
+        active_bots = []
+        
+        for bot_id, bot_manager in bot_managers.items():
+            if bot_manager.is_running:
+                bot_status = bot_manager.get_bot_status()
+                
+                # Get trade history for better performance data
+                trade_history = bot_manager.get_trade_history()
+                
+                active_bots.append({
+                    'bot_id': bot_id,
+                    'strategy': bot_status['strategy'],
+                    'config': bot_status['config'],
+                    'performance': bot_status['performance'],
+                    'is_running': bot_status['is_running'],
+                    'auto_trading': bot_status['auto_trading'],
+                    'active_trades': bot_status['active_trades'],
+                    'trade_history': trade_history[:10],  # Last 10 trades
+                    'created_at': datetime.now().isoformat(),  # Fallback timestamp
+                    'last_activity': datetime.now().isoformat()
+                })
+        
+        socketio.emit('active_bots_response', {
+            'success': True,
+            'bots': active_bots,
+            'count': len(active_bots),
+            'timestamp': datetime.now().isoformat()
+        }, room=request.sid)
+        
+        log.info(f"Returned {len(active_bots)} active bots to client")
+        
+    except Exception as e:
+        log.error(f"Error getting active bots: {e}")
+        socketio.emit('active_bots_response', {
+            'success': False,
+            'error': str(e),
+            'bots': [],
+            'timestamp': datetime.now().isoformat()
+        }, room=request.sid)
+
+@socketio.on('force_performance_update')
+def handle_force_performance_update(data):
+    """Handle request to force performance update for debugging"""
+    try:
+        bot_id = data.get('bot_id') if data else None
+        
+        if not bot_id:
+            raise ValueError("bot_id is required")
+        
+        if bot_id not in bot_managers:
+            raise ValueError(f"Bot {bot_id} not found")
+        
+        bot_manager = bot_managers[bot_id]
+        performance = bot_manager.force_performance_update()
+        
+        # Send fresh performance data
+        socketio.emit('bot_update', {
+            'type': 'forced_update',
+            'bot_id': bot_id,
+            'performance': performance,
+            'timestamp': datetime.now().isoformat()
+        }, room=request.sid)
+        
+        socketio.emit('force_update_response', {
+            'success': True,
+            'bot_id': bot_id,
+            'performance': performance,
+            'timestamp': datetime.now().isoformat()
+        }, room=request.sid)
+        
+        log.info(f"Forced performance update for bot {bot_id}")
+        
+    except Exception as e:
+        log.error(f"Error in force performance update: {e}")
+        socketio.emit('force_update_response', {
+            'success': False,
             'error': str(e),
             'timestamp': datetime.now().isoformat()
         }, room=request.sid)

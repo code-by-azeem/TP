@@ -1,52 +1,114 @@
-.trading-chart-container {
-    background-color: #1f2937; /* Dark navy */
-    border-radius: 8px;
-    padding: 20px;
-    margin: 20px;
-    border: 1px solid rgba(82, 196, 26, 0.2); /* Green border */
+.trading-chart {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: #1e222d;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
 .chart-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 15px 20px;
+  background: linear-gradient(135deg, #2a2e39, #1e222d);
+  border-bottom: 1px solid #333;
 }
 
-.chart-header h2 {
-    color: #52c41a; /* Green */
-    margin: 0;
+.chart-header h3 {
+  color: #52c41a;
+  margin: 0;
+  font-size: 1.2rem;
+  font-weight: 600;
 }
 
-.timeframe-selector {
-    display: flex;
-    gap: 8px;
+.chart-status {
+  display: flex;
+  align-items: center;
+  gap: 15px;
 }
 
-.timeframe-selector button {
-    background-color: #374151; /* Dark navy */
-    border: 1px solid rgba(82, 196, 26, 0.2); /* Green border */
-    color: #d1d5db;
-    padding: 6px 12px;
-    border-radius: 4px;
-    cursor: pointer;
-    transition: all 0.2s ease;
+.status-indicator {
+  padding: 4px 8px;
+  border-radius: 12px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  transition: all 0.3s ease;
 }
 
-.timeframe-selector button:hover {
-    background-color: rgba(82, 196, 26, 0.1); /* Green hover */
-    color: #52c41a;
-    border-color: rgba(82, 196, 26, 0.4);
+.status-indicator.connected {
+  background: rgba(16, 185, 129, 0.2);
+  color: #10b981;
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  animation: connectedPulse 2s infinite;
 }
 
-.timeframe-selector button.active {
-    background-color: #52c41a; /* Green active */
-    color: white;
-    border-color: #52c41a;
+.status-indicator.disconnected {
+  background: rgba(239, 68, 68, 0.2);
+  color: #ef4444;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+@keyframes connectedPulse {
+  0%, 100% { 
+    background: rgba(16, 185, 129, 0.2);
+    border-color: rgba(16, 185, 129, 0.3);
+  }
+  50% { 
+    background: rgba(16, 185, 129, 0.3);
+    border-color: rgba(16, 185, 129, 0.5);
+  }
+}
+
+.last-update {
+  color: #9ca3af;
+  font-size: 0.8rem;
+  font-weight: 400;
 }
 
 .chart-container {
-    width: 100%;
-    height: 500px;
-    position: relative;
+  flex: 1;
+  min-height: 400px;
+  background: #1e222d;
+  position: relative;
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+  .chart-header {
+    padding: 10px 15px;
+    flex-direction: column;
+    gap: 10px;
+    align-items: flex-start;
+  }
+  
+  .chart-status {
+    gap: 10px;
+  }
+  
+  .chart-header h3 {
+    font-size: 1rem;
+  }
+  
+  .status-indicator,
+  .last-update {
+    font-size: 0.8rem;
+  }
+  
+  .chart-container {
+    min-height: 300px;
+  }
+}
+
+@media (max-width: 480px) {
+  .chart-header {
+    padding: 8px 12px;
+  }
+  
+  .chart-container {
+    min-height: 250px;
+  }
 } 

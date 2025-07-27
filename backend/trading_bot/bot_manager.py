@@ -19,6 +19,21 @@ class TradingBotManager:
         self.active_trades = {}
         self.bot_thread = None
         self.update_callbacks = []
+        self.bot_id = None  # Track which bot this manager belongs to
+        self.unique_magic_number = None  # Unique magic number for this bot instance
+        self.bot_start_time = None  # When this bot instance started
+        
+        # PERSISTENT performance tracking - survives trade closures
+        self.lifetime_stats = {
+            'total_completed_trades': 0,
+            'total_winning_trades': 0,
+            'total_losing_trades': 0,
+            'lifetime_realized_profit': 0.0,
+            'lifetime_max_drawdown': 0.0,
+            'peak_balance': 0.0,
+            'completed_trade_history': [],  # Store completed trades
+            'daily_stats': {}  # Track daily performance
+        }
         
         # Bot configuration
         self.config = {
@@ -30,14 +45,19 @@ class TradingBotManager:
             'take_profit_pips': 100
         }
         
-        # Performance tracking
+        # Performance tracking - start fresh for each bot instance
         self.performance = {
             'total_trades': 0,
             'winning_trades': 0,
             'losing_trades': 0,
             'total_profit': 0.0,
             'win_rate': 0.0,
-            'daily_pnl': 0.0
+            'daily_pnl': 0.0,
+            'unrealized_pnl': 0.0,
+            'total_pnl': 0.0,
+            'max_drawdown': 0.0,
+            'active_trades': 0,
+            'recent_trades': []
         }
         
     def register_update_callback(self, callback: Callable):
@@ -52,7 +72,7 @@ class TradingBotManager:
             except Exception as e:
                 log.error(f"Error in update callback: {e}")
     
-    def start_bot(self, strategy_name: str = "default"):
+    def start_bot(self, strategy_name: str = "default", bot_id: str = None):
         """Start the trading bot"""
         if self.is_running:
             log.warning("Bot is already running")
@@ -65,9 +85,33 @@ class TradingBotManager:
         log.info(f"Starting trading bot with strategy: {strategy_name}")
         self.is_running = True
         self.config['strategy_name'] = strategy_name
+        self.bot_id = bot_id  # Store bot ID
+        
+        # Generate unique magic number for this bot instance
+        self.unique_magic_number = self._generate_unique_magic_number()
+        
+        # Set bot start time for tracking purposes
+        self.bot_start_time = datetime.now()
+        
+        # Reset performance metrics for this new bot instance
+        self.performance = {
+            'total_trades': 0,
+            'winning_trades': 0,
+            'losing_trades': 0,
+            'total_profit': 0.0,
+            'win_rate': 0.0,
+            'daily_pnl': 0.0,
+            'unrealized_pnl': 0.0,
+            'total_pnl': 0.0,
+            'max_drawdown': 0.0,
+            'active_trades': 0,
+            'recent_trades': [],
+            'last_update': datetime.now().isoformat()
+        }
         
         # Log current configuration for debugging
         log.info(f"Bot Config: auto_trading={self.config['auto_trading_enabled']}, risk={self.config['max_risk_per_trade']}")
+        log.info(f"Bot {self.bot_id} assigned magic number: {self.unique_magic_number}")
         
         # Start bot in separate thread
         self.bot_thread = threading.Thread(target=self._bot_loop, daemon=True)
@@ -78,6 +122,9 @@ class TradingBotManager:
             'type': 'bot_status',
             'status': 'started',
             'strategy': strategy_name,
+            'bot_id': self.bot_id,
+            'magic_number': self.unique_magic_number,
+            'start_time': self.bot_start_time.isoformat(),
             'timestamp': datetime.now().isoformat()
         })
         
@@ -99,6 +146,7 @@ class TradingBotManager:
         self.notify_updates({
             'type': 'bot_status',
             'status': 'stopped',
+            'bot_id': self.bot_id,
             'timestamp': datetime.now().isoformat()
         })
         
@@ -109,6 +157,9 @@ class TradingBotManager:
         log.info("🤖 Bot loop started")
         log.info(f"🔧 Initial Bot Config: auto_trading={self.config['auto_trading_enabled']}, strategy={self.config['strategy_name']}")
         
+        last_trade_minute = 0  # Track the last minute when trade was attempted
+        last_performance_update = 0  # Track last performance update
+        
         while self.is_running:
             try:
                 # Get current market data
@@ -117,42 +168,56 @@ class TradingBotManager:
                     log.warning(f"No tick data for {self.symbol}")
                     time.sleep(1)
                     continue
-                    
-                # Check for trading signals
-                signal = self._analyze_market()
                 
-                # Log signal analysis for debugging
-                if signal:
-                    log.info(f"🎯 SIGNAL GENERATED: {signal['type']} at {signal['price']} - {signal.get('reason', 'No reason')}")
-                    if self.config['auto_trading_enabled']:
-                        log.info("✅ Auto trading enabled - executing trade")
-                        self._execute_trade(signal)
-                    else:
-                        log.warning("⚠️ Auto trading DISABLED - skipping trade execution")
-                else:
-                    # Log every 10 iterations to avoid spam
-                    if hasattr(self, '_no_signal_counter'):
-                        self._no_signal_counter += 1
-                    else:
-                        self._no_signal_counter = 1
-                    
-                    if self._no_signal_counter % 10 == 0:
-                        log.info(f"📊 No signal generated (checked {self._no_signal_counter} times) - auto_trading: {self.config['auto_trading_enabled']}")
-                    
-                # Update performance metrics
-                self._update_performance()
+                # Get current minute to control trade frequency
+                current_time = time.time()
+                current_minute = int(current_time // 60)  # Convert to minute intervals
                 
-                # Notify frontend with updates
+                # Only analyze and potentially trade once per minute
+                should_analyze = current_minute > last_trade_minute
+                
+                if should_analyze:
+                    # Check for trading signals
+                    signal = self._analyze_market()
+                    
+                    # Log signal analysis for debugging
+                    if signal:
+                        log.info(f"🎯 SIGNAL GENERATED: {signal['type']} at {signal['price']} - {signal.get('reason', 'No reason')}")
+                        if self.config['auto_trading_enabled']:
+                            log.info("✅ Auto trading enabled - executing trade")
+                            self._execute_trade(signal)
+                            last_trade_minute = current_minute  # Update last trade minute
+                            
+                            # IMMEDIATE performance update after trade execution
+                            self._update_performance()
+                            
+                        else:
+                            log.warning("⚠️ Auto trading DISABLED - skipping trade execution")
+                            last_trade_minute = current_minute  # Still update to avoid spam
+                    else:
+                        # Log once per minute when no signal
+                        log.info(f"📊 No signal generated at minute {current_minute} - auto_trading: {self.config['auto_trading_enabled']}")
+                        last_trade_minute = current_minute
+                
+                # Update performance metrics more frequently (every 10 seconds instead of every minute)
+                performance_update_interval = 10  # seconds
+                if current_time - last_performance_update >= performance_update_interval:
+                    self._update_performance()
+                    last_performance_update = current_time
+                
+                # Always notify frontend with updates (for responsive UI)
                 self.notify_updates({
                     'type': 'bot_update',
+                    'bot_id': self.bot_id,
                     'current_price': current_tick.bid,
-                    'signal': signal,
-                    'performance': self.performance,
-                    'active_trades': len(self.active_trades),
-                    'timestamp': datetime.now().isoformat()
+                    'signal': signal if should_analyze else None,
+                    'performance': self.performance,  # Always include complete performance data
+                    'active_trades': self.performance.get('active_trades', 0),  # Use performance data
+                    'timestamp': datetime.now().isoformat(),
+                    'next_analysis_in': 60 - int(current_time % 60)  # Seconds until next analysis
                 })
                 
-                time.sleep(1)  # Main loop interval
+                time.sleep(1)  # Keep 1-second loop for responsive UI updates
                 
             except Exception as e:
                 log.error(f"❌ Error in bot loop: {e}")
@@ -259,8 +324,8 @@ class TradingBotManager:
             
             log.info(f"📊 Pip calculation: pip_size={pip_size}, min_distance={min_distance}, stops_level={symbol_info.trade_stops_level}")
 
-            # Prepare the trade request with safe comment
-            safe_comment = f"TradePulse_{signal['type']}"[:31]  # MT5 comment limit is 31 chars
+            # Prepare the trade request with safe comment and unique magic number
+            safe_comment = f"TradePulse_{self.bot_id}_{signal['type']}"[:31]  # MT5 comment limit is 31 chars
 
             # Try different filling modes and SL/TP combinations
             filling_modes = [
@@ -286,7 +351,7 @@ class TradingBotManager:
                         "type": order_type,
                         "price": current_price,
                         "deviation": 20,
-                        "magic": 234000,  # EA magic number
+                        "magic": self.unique_magic_number,  # Use bot-specific magic number
                         "comment": safe_comment,
                         "type_time": mt5.ORDER_TIME_GTC,
                         "type_filling": filling_mode,
@@ -359,14 +424,16 @@ class TradingBotManager:
                 'tp': tp_price
             }
             
-            # Update performance metrics and log successful trade
-            self.performance['total_trades'] += 1
-            
+            # IMMEDIATELY update performance after successful trade
             log.info(f"✅ Trade completed! Ticket: {result.order}, Volume: {result.volume}, Price: {result.price}")
             
-            # Notify frontend
+            # Force immediate performance update
+            self._update_performance()
+            
+            # Notify frontend with updated performance
             self.notify_updates({
                 'type': 'trade_executed',
+                'bot_id': self.bot_id,
                 'trade_id': trade_id,
                 'ticket': result.order,
                 'signal': signal,
@@ -374,6 +441,7 @@ class TradingBotManager:
                 'price': result.price,
                 'sl': sl_price,
                 'tp': tp_price,
+                'performance': self.performance,  # Include updated performance
                 'timestamp': datetime.now().isoformat()
             })
             
@@ -385,21 +453,319 @@ class TradingBotManager:
         """Notify frontend about trade execution errors"""
         self.notify_updates({
             'type': 'trade_error',
+            'bot_id': self.bot_id,
             'error': error_type,
             'details': details,
             'timestamp': datetime.now().isoformat()
         })
             
     def _update_performance(self):
-        """Update bot performance metrics"""
-        # Calculate performance metrics based on active/closed trades
-        # This is a placeholder implementation
-        total_trades = len(self.active_trades)
-        self.performance.update({
-            'total_trades': total_trades,
-            'active_trades': len([t for t in self.active_trades.values() if t['status'] == 'active']),
-            'last_update': datetime.now().isoformat()
-        })
+        """Update bot performance metrics based on ONLY this bot's trades"""
+        try:
+            # Skip if bot hasn't been properly initialized
+            if not self.unique_magic_number or not self.bot_start_time:
+                log.debug(f"Bot {self.bot_id} not fully initialized for performance tracking")
+                return
+                
+            # Get actual account info
+            if not mt5.initialize():
+                log.warning("MT5 not initialized for performance update")
+                return
+                
+            # Get account info for general data
+            account_info = mt5.account_info()
+            if account_info:
+                current_balance = account_info.balance
+                current_equity = account_info.equity
+                
+                # Update performance with real account data
+                self.performance.update({
+                    'account_balance': current_balance,
+                    'account_equity': current_equity,
+                    'floating_pnl': current_equity - current_balance
+                })
+            
+            # Get trade history ONLY from when this bot started (not all history)
+            from datetime import timedelta
+            
+            # Get deals from bot start time to now - this ensures we only get THIS bot's trades
+            deals = mt5.history_deals_get(self.bot_start_time, datetime.now())
+            bot_specific_trades = []
+            
+            log.debug(f"Checking deals from {self.bot_start_time} for bot {self.bot_id} with magic {self.unique_magic_number}")
+            
+            if deals:
+                for deal in deals:
+                    magic_number = getattr(deal, 'magic', 0)
+                    comment = getattr(deal, 'comment', '')
+                    deal_type = getattr(deal, 'type', -1)
+                    
+                    # STRICT filtering: ONLY this bot's trades
+                    is_this_bot_trade = (
+                        magic_number == self.unique_magic_number or  # Bot's unique magic number
+                        (f"TradePulse_{self.bot_id}" in comment and magic_number >= 234000)  # Bot-specific comment only
+                    )
+                    
+                    # Only include actual trade deals (not balance operations)
+                    if is_this_bot_trade and deal_type in [0, 1]:  # BUY or SELL deals
+                        profit = getattr(deal, 'profit', 0)
+                        commission = getattr(deal, 'commission', 0)
+                        swap = getattr(deal, 'swap', 0)
+                        net_profit = profit + commission + swap
+                        
+                        bot_specific_trades.append({
+                            'ticket': getattr(deal, 'ticket', 0),
+                            'position_id': getattr(deal, 'position_id', 0),
+                            'time': datetime.fromtimestamp(getattr(deal, 'time', 0)),
+                            'type': 'BUY' if deal_type == 0 else 'SELL',
+                            'volume': getattr(deal, 'volume', 0),
+                            'price': getattr(deal, 'price', 0),
+                            'profit': net_profit,
+                            'raw_profit': profit,
+                            'commission': commission,
+                            'swap': swap,
+                            'magic': magic_number,
+                            'comment': comment
+                        })
+                        
+                        log.debug(f"Found bot trade: ticket={getattr(deal, 'ticket', 0)}, "
+                                f"magic={magic_number}, profit={net_profit:.2f}, comment={comment}")
+            
+            # If no bot-specific trades found, try fallback method for recent TradePulse trades
+            if len(bot_specific_trades) == 0:
+                log.info(f"No specific trades found for bot {self.bot_id}, trying fallback method...")
+                fallback_trades = self._find_recent_bot_trades_fallback()
+                if fallback_trades:
+                    # Use fallback trades but limit to reasonable number
+                    bot_specific_trades = fallback_trades[:10]  # Max 10 recent trades
+                    log.info(f"Using {len(bot_specific_trades)} fallback trades for bot {self.bot_id}")
+            
+            # Detect newly completed trades first
+            self._detect_completed_trades(bot_specific_trades)
+            
+            # Group deals by position_id to count actual completed trades (not individual deals)
+            position_groups = {}
+            for trade in bot_specific_trades:
+                pos_id = trade['position_id']
+                if pos_id not in position_groups:
+                    position_groups[pos_id] = []
+                position_groups[pos_id].append(trade)
+            
+            # Calculate metrics from completed positions
+            completed_trades = []
+            for pos_id, trades in position_groups.items():
+                if len(trades) >= 2:  # Position opened and closed
+                    # Calculate total profit for this position
+                    total_profit = sum(t['profit'] for t in trades)
+                    # Use the last trade for timing (close)
+                    last_trade = max(trades, key=lambda x: x['time'])
+                    completed_trades.append({
+                        'position_id': pos_id,
+                        'profit': total_profit,
+                        'time': last_trade['time'],
+                        'type': last_trade['type'],
+                        'volume': last_trade['volume'],
+                        'price': last_trade['price']
+                    })
+                elif len(trades) == 1:
+                    # Single deal - might be a closing deal or instant execution
+                    trade = trades[0]
+                    if trade['profit'] != 0:  # Has profit/loss, so it's a completed trade
+                        completed_trades.append({
+                            'position_id': pos_id,
+                            'profit': trade['profit'],
+                            'time': trade['time'],
+                            'type': trade['type'],
+                            'volume': trade['volume'],
+                            'price': trade['price']
+                        })
+            
+            # COMBINE lifetime stats with current session stats for complete picture
+            total_trades = self.lifetime_stats['total_completed_trades'] + len(completed_trades)
+            winning_trades = self.lifetime_stats['total_winning_trades'] + len([t for t in completed_trades if t['profit'] > 0])
+            losing_trades = self.lifetime_stats['total_losing_trades'] + len([t for t in completed_trades if t['profit'] < 0])
+            session_profit = sum(t['profit'] for t in completed_trades)
+            total_realized_profit = self.lifetime_stats['lifetime_realized_profit'] + session_profit
+            win_rate = (winning_trades / total_trades * 100) if total_trades > 0 else 0
+            
+            # Calculate daily P&L (from lifetime stats for today)
+            today = datetime.now().strftime('%Y-%m-%d')
+            daily_pnl = 0.0
+            if today in self.lifetime_stats['daily_stats']:
+                daily_pnl = self.lifetime_stats['daily_stats'][today]['profit']
+            
+            # Add session profit to daily P&L
+            daily_pnl += session_profit
+            
+            # Calculate max drawdown (combine lifetime and session)
+            session_running_pnl = 0
+            session_peak = 0
+            session_max_drawdown = 0
+            
+            for trade in sorted(completed_trades, key=lambda x: x['time']):
+                session_running_pnl += trade['profit']
+                if session_running_pnl > session_peak:
+                    session_peak = session_running_pnl
+                drawdown = session_peak - session_running_pnl
+                if drawdown > session_max_drawdown:
+                    session_max_drawdown = drawdown
+            
+            max_drawdown = max(self.lifetime_stats['lifetime_max_drawdown'], session_max_drawdown)
+            
+            # Get open positions for THIS bot only
+            open_positions = mt5.positions_get()
+            if open_positions is None:
+                open_positions = []
+            
+            log.debug(f"Total open positions in MT5: {len(open_positions)}")
+            
+            # Filter positions by THIS bot's magic number OR bot-specific comment
+            bot_positions = []
+            for pos in open_positions:
+                pos_magic = getattr(pos, 'magic', 0)
+                pos_comment = getattr(pos, 'comment', '')
+                pos_ticket = getattr(pos, 'ticket', 0)
+                pos_profit = getattr(pos, 'profit', 0)
+                
+                # STRICT position filtering - ONLY this bot's trades
+                belongs_to_bot = (
+                    pos_magic == self.unique_magic_number or 
+                    (f"TradePulse_{self.bot_id}" in pos_comment and pos_magic >= 234000)
+                )
+                
+                if belongs_to_bot:
+                    bot_positions.append(pos)
+                    log.info(f"Found bot position: ticket={pos_ticket}, magic={pos_magic}, "
+                           f"profit={pos_profit:.2f}, comment='{pos_comment}'")
+                else:
+                    log.debug(f"Skipped position: ticket={pos_ticket}, magic={pos_magic}, comment='{pos_comment}'")
+            
+            log.info(f"Bot {self.bot_id} has {len(bot_positions)} open positions out of {len(open_positions)} total")
+            
+            # Calculate unrealized P&L from THIS bot's open positions
+            unrealized_pnl = 0
+            for pos in bot_positions:
+                profit = getattr(pos, 'profit', 0)
+                commission = getattr(pos, 'commission', 0)
+                swap = getattr(pos, 'swap', 0)
+                unrealized_pnl += profit + commission + swap
+            
+            # Update performance with COMBINED lifetime + session data
+            self.performance.update({
+                'total_trades': total_trades,  # Lifetime + session
+                'winning_trades': winning_trades,  # Lifetime + session
+                'losing_trades': losing_trades,  # Lifetime + session
+                'total_profit': round(total_realized_profit, 2),  # Lifetime + session realized
+                'daily_pnl': round(daily_pnl, 2),  # Today's total
+                'win_rate': round(win_rate, 1),  # Combined win rate
+                'max_drawdown': round(max_drawdown, 2),  # Combined max drawdown
+                'active_trades': len(bot_positions),  # Current open positions
+                'unrealized_pnl': round(unrealized_pnl, 2),  # Current unrealized
+                'total_pnl': round(total_realized_profit + unrealized_pnl, 2),  # Total realized + unrealized
+                'last_update': datetime.now().isoformat(),
+                'magic_number': self.unique_magic_number,  # For debugging
+                'bot_start_time': self.bot_start_time.isoformat(),  # For reference
+                'lifetime_stats': {  # Include lifetime stats for frontend
+                    'completed_trades': self.lifetime_stats['total_completed_trades'],
+                    'lifetime_profit': self.lifetime_stats['lifetime_realized_profit'],
+                    'lifetime_winning': self.lifetime_stats['total_winning_trades'],
+                    'lifetime_losing': self.lifetime_stats['total_losing_trades']
+                }
+            })
+            
+            # Store recent trades for frontend display (combine lifetime + session)
+            all_recent_trades = []
+            
+            # Add completed trades from lifetime stats
+            for trade in self.lifetime_stats['completed_trade_history'][-5:]:  # Last 5 lifetime trades
+                all_recent_trades.append({
+                    'ticket': trade['ticket'],
+                    'time': trade['time'].isoformat() if isinstance(trade['time'], datetime) else trade['time'],
+                    'type': trade['type'],
+                    'volume': trade['volume'],
+                    'price': trade['price'],
+                    'profit': trade['profit'],
+                    'bot_id': trade['bot_id']
+                })
+            
+            # Add current session trades
+            session_trades = sorted(bot_specific_trades, key=lambda x: x['time'], reverse=True)[:5]
+            for t in session_trades:
+                all_recent_trades.append({
+                    'ticket': t['ticket'],
+                    'time': t['time'].isoformat(),
+                    'type': t['type'],
+                    'volume': t['volume'],
+                    'price': t['price'],
+                    'profit': t['profit'],
+                    'bot_id': self.bot_id
+                })
+            
+            # Sort by time and keep last 10
+            all_recent_trades.sort(key=lambda x: x['time'], reverse=True)
+            self.performance['recent_trades'] = all_recent_trades[:10]
+            
+            log.info(f"📊 Bot {self.bot_id} COMPLETE performance: {total_trades} total trades "
+                    f"(lifetime: {self.lifetime_stats['total_completed_trades']}, session: {len(completed_trades)}), "
+                    f"{win_rate:.1f}% win rate, ${total_realized_profit:.2f} realized, "
+                    f"${unrealized_pnl:.2f} unrealized, ${total_realized_profit + unrealized_pnl:.2f} total P&L, "
+                    f"W:{winning_trades}/L:{losing_trades}")
+            
+        except Exception as e:
+            log.error(f"Error updating performance for bot {self.bot_id}: {e}")
+            # Fallback to basic tracking
+            self.performance.update({
+                'total_trades': 0,
+                'active_trades': 0,
+                'last_update': datetime.now().isoformat()
+            })
+    
+    def get_trade_history(self):
+        """Get recent trade history for THIS bot only"""
+        try:
+            if not mt5.initialize():
+                return []
+            
+            # Skip if bot hasn't been properly initialized
+            if not self.unique_magic_number or not self.bot_start_time:
+                log.debug(f"Bot {self.bot_id} not fully initialized for trade history")
+                return []
+                
+            # Get trade history from when this bot started
+            deals = mt5.history_deals_get(self.bot_start_time, datetime.now())
+            bot_trades = []
+            
+            if deals:
+                for deal in deals:
+                    magic_number = getattr(deal, 'magic', 0)
+                    comment = getattr(deal, 'comment', '')
+                    deal_type = getattr(deal, 'type', -1)
+                    
+                    # STRICT filtering: Only trades with THIS bot's magic number
+                    is_this_bot_trade = (
+                        magic_number == self.unique_magic_number or 
+                        (f"TradePulse_{self.bot_id}" in comment and magic_number >= 234000)
+                    )
+                    
+                    # Only include actual trade deals
+                    if is_this_bot_trade and deal_type in [0, 1]:  # BUY or SELL deals
+                        bot_trades.append({
+                            'ticket': getattr(deal, 'ticket', 0),
+                            'position_id': getattr(deal, 'position_id', 0),
+                            'time': datetime.fromtimestamp(getattr(deal, 'time', 0)).isoformat(),
+                            'type': 'BUY' if deal_type == 0 else 'SELL',
+                            'volume': getattr(deal, 'volume', 0),
+                            'price': getattr(deal, 'price', 0),
+                            'profit': getattr(deal, 'profit', 0) + getattr(deal, 'commission', 0) + getattr(deal, 'swap', 0),
+                            'magic': magic_number
+                        })
+            
+            log.debug(f"Bot {self.bot_id} trade history: {len(bot_trades)} trades found")
+            return sorted(bot_trades, key=lambda x: x['time'], reverse=True)
+            
+        except Exception as e:
+            log.error(f"Error getting trade history for bot {self.bot_id}: {e}")
+            return []
         
     def get_bot_status(self) -> Dict:
         """Get current bot status"""
@@ -409,7 +775,10 @@ class TradingBotManager:
             'auto_trading': self.config['auto_trading_enabled'],
             'performance': self.performance,
             'active_trades': len(self.active_trades),
-            'config': self.config
+            'config': self.config,
+            'magic_number': self.unique_magic_number,
+            'bot_start_time': self.bot_start_time.isoformat() if self.bot_start_time else None,
+            'bot_id': self.bot_id
         }
         
     def update_config(self, new_config: Dict):
@@ -438,6 +807,197 @@ class TradingBotManager:
     def get_available_strategies(self) -> List[str]:
         """Get list of available strategies"""
         return list_strategies()
+
+    def force_performance_update(self):
+        """Force an immediate performance update - useful for debugging"""
+        log.info(f"🔄 Force updating performance for bot {self.bot_id}")
+        self._update_performance()
+        
+        # Log detailed performance data
+        log.info(f"📊 DETAILED Performance for {self.bot_id}:")
+        log.info(f"   - Total Trades: {self.performance.get('total_trades', 0)}")
+        log.info(f"   - Active Trades: {self.performance.get('active_trades', 0)}")
+        log.info(f"   - Win Rate: {self.performance.get('win_rate', 0)}%")
+        log.info(f"   - Winning Trades: {self.performance.get('winning_trades', 0)}")
+        log.info(f"   - Losing Trades: {self.performance.get('losing_trades', 0)}")
+        log.info(f"   - Realized P&L: ${self.performance.get('total_profit', 0)}")
+        log.info(f"   - Unrealized P&L: ${self.performance.get('unrealized_pnl', 0)}")
+        log.info(f"   - Total P&L: ${self.performance.get('total_pnl', 0)}")
+        log.info(f"   - Magic Number: {self.unique_magic_number}")
+        
+        return self.performance
+
+    def _generate_unique_magic_number(self):
+        """Generate a unique magic number for this bot instance"""
+        import hashlib
+        import time
+        
+        # Create unique identifier from bot_id and timestamp
+        unique_string = f"{self.bot_id}_{int(time.time())}"
+        hash_obj = hashlib.md5(unique_string.encode())
+        
+        # Convert to integer and ensure it's within MT5 limits (0-2147483647)
+        magic_number = int(hash_obj.hexdigest()[:8], 16) % 2147483647
+        
+        # Ensure it's not 0 and is in a reasonable range for our bots (234000-300000)
+        magic_number = 234000 + (magic_number % 66000)
+        
+        log.info(f"Generated unique magic number for bot {self.bot_id}: {magic_number}")
+        return magic_number
+
+    def _find_recent_bot_trades_fallback(self):
+        """Fallback method to find recent trades that might belong to this bot"""
+        try:
+            # For bots that were started recently, also look for ANY recent TradePulse trades
+            # This helps capture trades that were executed before the unique magic number system
+            from datetime import timedelta
+            
+            # Look back 60 minutes for any TradePulse trades (increased from 30)
+            recent_time = datetime.now() - timedelta(minutes=60)
+            deals = mt5.history_deals_get(recent_time, datetime.now())
+            
+            fallback_trades = []
+            if deals:
+                log.info(f"Fallback: Checking {len(deals)} deals from last 60 minutes")
+                
+                for deal in deals:
+                    magic_number = getattr(deal, 'magic', 0)
+                    comment = getattr(deal, 'comment', '')
+                    deal_type = getattr(deal, 'type', -1)
+                    deal_time = datetime.fromtimestamp(getattr(deal, 'time', 0))
+                    
+                    # Enhanced TradePulse trade detection
+                    is_tradepulse_trade = (
+                        'TradePulse' in comment or 
+                        'tradepulse' in comment.lower() or
+                        (magic_number >= 234000 and magic_number <= 300000) or
+                        (magic_number >= 10000000 and magic_number <= 99999999)  # Also check for larger magic numbers
+                    )
+                    
+                    if is_tradepulse_trade and deal_type in [0, 1]:
+                        profit = getattr(deal, 'profit', 0)
+                        commission = getattr(deal, 'commission', 0)
+                        swap = getattr(deal, 'swap', 0)
+                        net_profit = profit + commission + swap
+                        
+                        fallback_trades.append({
+                            'ticket': getattr(deal, 'ticket', 0),
+                            'position_id': getattr(deal, 'position_id', 0),
+                            'time': deal_time,
+                            'type': 'BUY' if deal_type == 0 else 'SELL',
+                            'volume': getattr(deal, 'volume', 0),
+                            'price': getattr(deal, 'price', 0),
+                            'profit': net_profit,
+                            'raw_profit': profit,
+                            'commission': commission,
+                            'swap': swap,
+                            'magic': magic_number,
+                            'comment': comment,
+                            'fallback': True  # Mark as fallback trade
+                        })
+                        
+                        log.info(f"Fallback found: Ticket={getattr(deal, 'ticket', 0)}, Magic={magic_number}, "
+                               f"Comment='{comment}', Profit={net_profit:.2f}, Time={deal_time}")
+            
+            log.info(f"Fallback search found {len(fallback_trades)} recent TradePulse trades")
+            return fallback_trades
+            
+        except Exception as e:
+            log.error(f"Error in fallback trade search: {e}")
+            return []
+
+    def _track_completed_trade(self, trade_data):
+        """Track a completed trade in lifetime statistics"""
+        try:
+            profit = trade_data.get('profit', 0)
+            
+            # Update lifetime counters
+            self.lifetime_stats['total_completed_trades'] += 1
+            self.lifetime_stats['lifetime_realized_profit'] += profit
+            
+            if profit > 0:
+                self.lifetime_stats['total_winning_trades'] += 1
+            elif profit < 0:
+                self.lifetime_stats['total_losing_trades'] += 1
+            
+            # Add to completed trade history (keep last 50 trades)
+            trade_record = {
+                'ticket': trade_data.get('ticket', 0),
+                'position_id': trade_data.get('position_id', 0),
+                'time': trade_data.get('time', datetime.now()),
+                'type': trade_data.get('type', 'UNKNOWN'),
+                'volume': trade_data.get('volume', 0),
+                'price': trade_data.get('price', 0),
+                'profit': profit,
+                'bot_id': self.bot_id,
+                'magic_number': self.unique_magic_number,
+                'comment': trade_data.get('comment', ''),
+                'completed_at': datetime.now()
+            }
+            
+            self.lifetime_stats['completed_trade_history'].append(trade_record)
+            
+            # Keep only last 50 completed trades
+            if len(self.lifetime_stats['completed_trade_history']) > 50:
+                self.lifetime_stats['completed_trade_history'] = self.lifetime_stats['completed_trade_history'][-50:]
+            
+            # Update daily stats
+            today = datetime.now().strftime('%Y-%m-%d')
+            if today not in self.lifetime_stats['daily_stats']:
+                self.lifetime_stats['daily_stats'][today] = {
+                    'trades': 0,
+                    'profit': 0.0,
+                    'winning': 0,
+                    'losing': 0
+                }
+            
+            self.lifetime_stats['daily_stats'][today]['trades'] += 1
+            self.lifetime_stats['daily_stats'][today]['profit'] += profit
+            if profit > 0:
+                self.lifetime_stats['daily_stats'][today]['winning'] += 1
+            elif profit < 0:
+                self.lifetime_stats['daily_stats'][today]['losing'] += 1
+            
+            # Update max drawdown
+            current_balance = self.lifetime_stats['lifetime_realized_profit']
+            if current_balance > self.lifetime_stats['peak_balance']:
+                self.lifetime_stats['peak_balance'] = current_balance
+            
+            drawdown = self.lifetime_stats['peak_balance'] - current_balance
+            if drawdown > self.lifetime_stats['lifetime_max_drawdown']:
+                self.lifetime_stats['lifetime_max_drawdown'] = drawdown
+            
+            log.info(f"📝 Tracked completed trade for {self.bot_id}: Profit=${profit:.2f}, "
+                    f"Lifetime: {self.lifetime_stats['total_completed_trades']} trades, "
+                    f"${self.lifetime_stats['lifetime_realized_profit']:.2f} total profit")
+            
+        except Exception as e:
+            log.error(f"Error tracking completed trade: {e}")
+    
+    def _detect_completed_trades(self, current_bot_trades):
+        """Detect newly completed trades by comparing with previous state"""
+        try:
+            # Check if we have any deals that represent completed positions
+            for trade in current_bot_trades:
+                trade_key = f"{trade['position_id']}_{trade['ticket']}"
+                
+                # If this trade has profit and we haven't tracked it yet
+                if (trade['profit'] != 0 and 
+                    not any(ct['ticket'] == trade['ticket'] for ct in self.lifetime_stats['completed_trade_history'])):
+                    
+                    # This is a completed trade
+                    self._track_completed_trade(trade)
+                    
+                    # Notify frontend about the completed trade
+                    self.notify_updates({
+                        'type': 'trade_completed',
+                        'bot_id': self.bot_id,
+                        'trade_data': trade,
+                        'timestamp': datetime.now().isoformat()
+                    })
+                    
+        except Exception as e:
+            log.error(f"Error detecting completed trades: {e}")
 
 # Global bot manager instance
 bot_manager = TradingBotManager()

@@ -34,12 +34,18 @@ const logDataDebug = (message) => {
   console.log(`[DataFlow] ${message}`);
 };
 
+// For logging price update activities
+const logPriceDebug = (message) => {
+  console.log(`[PriceUpdate] ${message}`);
+};
+
 // Track updates per second for performance monitoring
 const updateStats = {
   lastSecond: Date.now(),
   updates: 0,
   total: 0,
   maxPerSecond: 0,
+  lastUpdateTime: 0,
   logStats: function() {
     this.total++;
     this.updates++;
@@ -48,11 +54,20 @@ const updateStats = {
       // Only log when there are significant updates
       if (this.updates > 0) {
         this.maxPerSecond = Math.max(this.maxPerSecond, this.updates);
-        logDataDebug(`Updates: ${this.updates}/sec (max: ${this.maxPerSecond}, total: ${this.total})`);
+        logDataDebug(`Chart updates: ${this.updates}/sec (max: ${this.maxPerSecond}, total: ${this.total})`);
       }
       this.updates = 0;
       this.lastSecond = now;
     }
+  },
+  // Throttle updates to prevent overwhelming the chart
+  shouldUpdate: function(minInterval = 200) {
+    const now = Date.now();
+    if (now - this.lastUpdateTime >= minInterval) {
+      this.lastUpdateTime = now;
+      return true;
+    }
+    return false;
   }
 };
 
@@ -573,20 +588,20 @@ function CandlestickChart() {
                         timestamp: new Date().getTime(),
                         userAgent: navigator.userAgent,
                         screen: `${window.innerWidth}x${window.innerHeight}`,
-                        update_frequency: 'high'
+                        update_frequency: 'optimized' // Changed from 'high' to 'optimized'
                     }
                 });
                 
-                // Request high-frequency updates (100ms or faster if possible)
+                // Request optimized updates for smooth performance (250ms for balance)
                 socketRef.current.emit('set_update_frequency', {
-                    frequency: 'realtime',
-                    max_delay: 50  // Target 50ms between updates for smoother experience
+                    frequency: 'optimized', // Changed from 'realtime'
+                    max_delay: 250  // Balanced 250ms for smooth performance without overwhelming
                 });
 
-                // Set high-frequency update mode
+                // Set balanced update mode for chart performance
                 socketRef.current.emit('set_update_mode', { 
-                    mode: 'high_frequency',
-                    preferred_interval: 100 // 100ms for smoother updates
+                    mode: 'balanced', // Changed from 'high_frequency'
+                    preferred_interval: 250 // 250ms for optimal chart performance
                 });
             });
 
@@ -611,48 +626,20 @@ function CandlestickChart() {
                 }));
             });
 
-            // Handle price updates
+            // Real-time price updates with intelligent throttling
             socketRef.current.on('price_update', (data) => {
-                if (!data) {
-                    console.error("Received empty price update");
-                    return;
+                // Throttle updates to prevent overwhelming the chart (200ms minimum)
+                if (!updateStats.shouldUpdate(200)) {
+                    return; // Skip this update to maintain smooth performance
                 }
+
+                updateStats.logStats();
                 
                 try {
-                    // Debug log to see what format we're receiving
-                    console.debug("Received price update:", JSON.stringify(data).substring(0, 200));
+                    logPriceDebug(`Throttled price update: ${JSON.stringify(data)}`);
                     
-                    // Process the update if we have valid data
-                    if (data && (data.timeframe || data.time)) {
-                        // Check if this update is for our current timeframe or if timeframe not specified
-                        const updateTimeframe = data.timeframe || timeframeRef.current;
-                        
-                        // First, validate and fix the timestamp before any processing
-                        if (data.time) {
-                            // Ensure time is a proper number, not an object
-                            if (typeof data.time === 'object') {
-                                console.log("Converting object timestamp from WebSocket:", data.time);
-                                data.time = normalizeTimestamp(data.time.valueOf ? data.time.valueOf() : Date.now());
-                            } else {
-                                data.time = normalizeTimestamp(data.time);
-                            }
-                            
-                            // Final check that it's a number
-                            if (typeof data.time !== 'number') {
-                                console.error("Failed to convert timestamp to number:", data.time);
-                                data.time = Math.floor(Date.now() / 1000); // Use current time as fallback
-                            }
-                        }
-                        
-                        if (updateTimeframe === timeframeRef.current) {
-                            // Process the update for the current timeframe
-                            handleCandleUpdate(data);
-                        } else {
-                            // Log timeframe mismatch but don't block processing
-                            logDataDebug(`Timeframe mismatch: received ${updateTimeframe}, expecting ${timeframeRef.current}`);
-                        }
-                        
-                        // Update UI state regardless of the timeframe (shows user there's activity)
+                    if (data && typeof data === 'object') {
+                        handleCandleUpdate(data);
                         setLastUpdateTime(new Date().toLocaleTimeString([], { 
                             hour: 'numeric', 
                             minute: '2-digit', 
@@ -660,10 +647,68 @@ function CandlestickChart() {
                             hour12: true 
                         }));
                     } else {
-                        console.warn("Received invalid price update structure:", data);
+                        logPriceDebug('Invalid price data received, skipping update');
                     }
-                } catch (err) {
-                    console.error("Error processing price update:", err, data);
+                } catch (error) {
+                    console.error('Error processing throttled price update:', error);
+                }
+            });
+
+            // Handle trade execution events with throttling
+            socketRef.current.on('trade_executed', (data) => {
+                // No throttling for trade execution - these are important events
+                updateStats.logStats();
+                logPriceDebug(`Trade executed: ${JSON.stringify(data)}`);
+                
+                try {
+                    // Trade execution events are critical - always process them
+                    if (data && data.signal) {
+                        // Update the last price immediately to reflect trade execution
+                        const tradePrice = data.price || data.signal.price;
+                        if (tradePrice && candlestickSeriesRef.current) {
+                            // Create a small price tick to show trade execution
+                            const currentTime = Math.floor(Date.now() / 1000);
+                            const tradeTick = {
+                                time: currentTime,
+                                open: tradePrice,
+                                high: tradePrice,
+                                low: tradePrice,
+                                close: tradePrice
+                            };
+                            handleCandleUpdate(tradeTick);
+                        }
+                        setLastUpdateTime(new Date().toLocaleTimeString([], { 
+                            hour: 'numeric', 
+                            minute: '2-digit', 
+                            second: '2-digit', 
+                            hour12: true 
+                        }));
+                    }
+                } catch (error) {
+                    console.error('Error processing trade execution:', error);
+                }
+            });
+
+            // Handle trade updates (P/L changes) with light throttling
+            socketRef.current.on('trade_update', (data) => {
+                // Light throttling for trade updates (100ms) - more frequent than price updates
+                if (!updateStats.shouldUpdate(100)) {
+                    return;
+                }
+                
+                updateStats.logStats();
+                logPriceDebug(`Trade update: ${data.type}`);
+                
+                try {
+                    // Just update the timestamp for trade events
+                    setLastUpdateTime(new Date().toLocaleTimeString([], { 
+                        hour: 'numeric', 
+                        minute: '2-digit', 
+                        second: '2-digit', 
+                        hour12: true 
+                    }));
+                } catch (error) {
+                    console.error('Error processing trade update:', error);
                 }
             });
 
@@ -773,7 +818,7 @@ function CandlestickChart() {
             setError(`Failed to connect: ${err.message}`);
             handleReconnect();
         }
-    }, [handleCandleUpdate, handleReconnect, normalizeTimestamp]);
+    }, [handleCandleUpdate, handleReconnect]); // Removed normalizeTimestamp - not used in this function
 
     // Store the function in ref to break dependency cycle
     useEffect(() => {

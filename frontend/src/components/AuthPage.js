@@ -167,40 +167,108 @@ const AuthPage = () => {
   };
 
   return (
-    <div className="centered-auth-wrapper">
-      <div className="centered-content">
-        <div className="auth-container">
-          <h2>{isLogin ? 'Login' : 'Sign Up'}</h2>
-      <form onSubmit={handleSubmit}>
-        <input
-          type="text"
-          placeholder="Username"
-          value={username}
-          onChange={e => setUsername(e.target.value)}
-          required
-          disabled={isLoading}
-          className={error && error.includes('Username') ? 'input-error' : ''}
-        />
-        <input
-          type="password"
-          placeholder="Password"
-          value={password}
-          onChange={e => setPassword(e.target.value)}
-          required
-          disabled={isLoading}
-          className={error && error.includes('Password') ? 'input-error' : ''}
-        />
-        <button type="submit" disabled={isLoading}>
-          {isLoading ? 'Processing...' : (isLogin ? 'Login' : 'Sign Up')}
-        </button>
-      </form>
-      <p className="toggle-link">
-        {isLogin ? "Don't have an account?" : "Already have an account?"}
-        <button type="button" onClick={handleModeToggle} disabled={isLoading}>
-          {isLogin ? 'Sign Up' : 'Login'}
-        </button>
-      </p>
-      {error && <div className="error">{error}</div>}
+    <div className="auth-page-wrapper">
+      {/* Left Side - Bot Image */}
+      <div className="auth-left-panel">
+        <div className="bot-image-container">
+          <img 
+            src="/bot.png" 
+            alt="TradePulse Trading Bot" 
+            className="bot-image"
+            onError={(e) => {
+              // Fallback if image doesn't exist
+              e.target.style.display = 'none';
+              e.target.nextSibling.style.display = 'flex';
+            }}
+          />
+          <div className="bot-image-fallback" style={{display: 'none'}}>
+            <svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="bot-fallback-icon">
+              <path d="M12 8V4H8"/>
+              <rect width="16" height="12" x="4" y="8" rx="2"/>
+              <path d="M2 14h2"/>
+              <path d="M20 14h2"/>
+              <path d="M15 13v2"/>
+              <path d="M9 13v2"/>
+            </svg>
+            <p>Trading Bot</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Right Side - Login Form */}
+      <div className="auth-right-panel">
+        <div className="auth-form-section">
+          {/* Welcome Header with Logo */}
+          <div className="welcome-header">
+            <img 
+              src="/logo.png" 
+              alt="TradePulse Logo" 
+              className="welcome-logo"
+              onError={(e) => {
+                e.target.style.display = 'none';
+                e.target.nextSibling.style.display = 'block';
+              }}
+            />
+            <svg 
+              xmlns="http://www.w3.org/2000/svg" 
+              width="48" 
+              height="48" 
+              viewBox="0 0 24 24" 
+              fill="none" 
+              stroke="currentColor" 
+              strokeWidth="2" 
+              strokeLinecap="round" 
+              strokeLinejoin="round"
+              className="welcome-logo-fallback"
+              style={{display: 'none'}}
+            >
+              <polyline points="22 8 22 2 16 2"></polyline>
+              <path d="M22 2L12 12"></path>
+              <path d="M8 16l-6 6"></path>
+              <path d="M19 21c1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3 1.34 3 3 3z"></path>
+              <path d="M3 8a5 5 0 0 1 5-5"></path>
+              <path d="M15 3a5 5 0 0 1 5 5"></path>
+            </svg>
+            <h1 className="welcome-title">Welcome to TradePulse</h1>
+            <p className="welcome-subtitle">Your Intelligent Trading Companion</p>
+          </div>
+
+          {/* Login/Signup Container */}
+          <div className="auth-container">
+            <h2>{isLogin ? 'Login' : 'Sign Up'}</h2>
+            <form onSubmit={handleSubmit}>
+              <input
+                type="text"
+                placeholder="Username"
+                value={username}
+                onChange={e => setUsername(e.target.value)}
+                required
+                disabled={isLoading}
+                className={error && error.includes('Username') ? 'input-error' : ''}
+              />
+              <input
+                type="password"
+                placeholder="Password"
+                value={password}
+                onChange={e => setPassword(e.target.value)}
+                required
+                disabled={isLoading}
+                className={error && error.includes('Password') ? 'input-error' : ''}
+              />
+              <button type="submit" disabled={isLoading}>
+                {isLoading ? 'Processing...' : (isLogin ? 'Login' : 'Sign Up')}
+              </button>
+            </form>
+            <p className="toggle-link">
+              {isLogin ? "Don't have an account?" : "Already have an account?"}
+              <button type="button" onClick={handleModeToggle} disabled={isLoading}>
+                {isLogin ? 'Sign Up' : 'Login'}
+              </button>
+            </p>
+            {error && <div className="error">{error}</div>}
+          </div>
+        </div>
+      </div>
       
       {/* Modal component */}
       <Modal
@@ -211,8 +279,6 @@ const AuthPage = () => {
         type={modalConfig.type}
         autoCloseDelay={modalConfig.autoCloseDelay}
       />
-        </div>
-      </div>
     </div>
   );
 };

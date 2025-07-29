@@ -86,7 +86,6 @@ function CandlestickChart() {
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState(null);
     const [isConnected, setIsConnected] = useState(false);
-    const [lastUpdateTime, setLastUpdateTime] = useState(null);
     const [isFullscreen, setIsFullscreen] = useState(false);
 
     // Helper function to ensure timestamp is in seconds (not milliseconds)
@@ -482,12 +481,6 @@ function CandlestickChart() {
             requestAnimationFrame(() => {
                 // Update UI state for activity indication
                 lastUpdateRef.current = new Date();
-                setLastUpdateTime(new Date().toLocaleTimeString([], { 
-                    hour: 'numeric', 
-                    minute: '2-digit', 
-                    second: '2-digit', 
-                    hour12: true 
-                }));
                 updateStats.logStats();
 
                 // Use the already-validated candle data
@@ -574,12 +567,14 @@ function CandlestickChart() {
                 reconnectCountRef.current = 0; // Reset reconnection attempts
                 
                 // Socket connected successfully
+                console.log(`✅ WebSocket connected successfully to ${FLASK_SERVER_URL}`);
                 
                 // Request initial data with the current timeframe
                 socketRef.current.emit('set_timeframe', { 
                     timeframe: timeframeRef.current,
                     full_history: true // Request complete history
                 });
+                logWebSocketDebug(`📡 Requested timeframe: ${timeframeRef.current} with full history`);
                 
                 // Let the server know we're ready for real-time updates
                 socketRef.current.emit('client_ready', { 
@@ -591,6 +586,7 @@ function CandlestickChart() {
                         update_frequency: 'optimized' // Changed from 'high' to 'optimized'
                     }
                 });
+                logWebSocketDebug(`🚀 Client ready signal sent for timeframe: ${timeframeRef.current}`);
                 
                 // Request optimized updates for smooth performance (250ms for balance)
                 socketRef.current.emit('set_update_frequency', {
@@ -603,6 +599,7 @@ function CandlestickChart() {
                     mode: 'balanced', // Changed from 'high_frequency'
                     preferred_interval: 250 // 250ms for optimal chart performance
                 });
+                logWebSocketDebug(`⚙️ Update mode configured: balanced with 250ms intervals`);
             });
 
             // Track transport changes
@@ -618,12 +615,6 @@ function CandlestickChart() {
             // Connection acknowledgment from server
             socketRef.current.on('connection_ack', (data) => {
                 logWebSocketDebug(`Connection acknowledged by server: ${JSON.stringify(data)}`);
-                setLastUpdateTime(new Date().toLocaleTimeString([], { 
-                    hour: 'numeric', 
-                    minute: '2-digit', 
-                    second: '2-digit', 
-                    hour12: true 
-                }));
             });
 
             // Real-time price updates with intelligent throttling
@@ -636,21 +627,17 @@ function CandlestickChart() {
                 updateStats.logStats();
                 
                 try {
-                    logPriceDebug(`Throttled price update: ${JSON.stringify(data)}`);
+                    logPriceDebug(`📈 Received price update: ${JSON.stringify(data)}`);
                     
                     if (data && typeof data === 'object') {
                         handleCandleUpdate(data);
-                        setLastUpdateTime(new Date().toLocaleTimeString([], { 
-                            hour: 'numeric', 
-                            minute: '2-digit', 
-                            second: '2-digit', 
-                            hour12: true 
-                        }));
+                        console.log(`💹 Price updated successfully for ${data.symbol || 'unknown'} at ${new Date().toLocaleTimeString()}`);
                     } else {
-                        logPriceDebug('Invalid price data received, skipping update');
+                        logPriceDebug('⚠️ Invalid price data received, skipping update');
+                        console.warn('Invalid price data format:', data);
                     }
                 } catch (error) {
-                    console.error('Error processing throttled price update:', error);
+                    console.error('❌ Error processing price update:', error);
                 }
             });
 
@@ -677,12 +664,6 @@ function CandlestickChart() {
                             };
                             handleCandleUpdate(tradeTick);
                         }
-                        setLastUpdateTime(new Date().toLocaleTimeString([], { 
-                            hour: 'numeric', 
-                            minute: '2-digit', 
-                            second: '2-digit', 
-                            hour12: true 
-                        }));
                     }
                 } catch (error) {
                     console.error('Error processing trade execution:', error);
@@ -700,13 +681,7 @@ function CandlestickChart() {
                 logPriceDebug(`Trade update: ${data.type}`);
                 
                 try {
-                    // Just update the timestamp for trade events
-                    setLastUpdateTime(new Date().toLocaleTimeString([], { 
-                        hour: 'numeric', 
-                        minute: '2-digit', 
-                        second: '2-digit', 
-                        hour12: true 
-                    }));
+                    // Trade event processed
                 } catch (error) {
                     console.error('Error processing trade update:', error);
                 }
@@ -749,9 +724,19 @@ function CandlestickChart() {
             socketRef.current.on('connect_error', (err) => {
                 logWebSocketDebug(`Socket connection error: ${err.message}`);
                 setIsConnected(false);
-                setError(`Connection error: ${err.message}`);
+                console.error(`❌ WebSocket connection error: ${err.message}`);
+                console.error(`🔍 Attempting to connect to: ${FLASK_SERVER_URL}`);
                 
-                console.log(`Connect Error logged: ${err.message} at ${new Date().toLocaleTimeString()}`);
+                // Provide more helpful error messages
+                if (err.message.includes('ECONNREFUSED')) {
+                    setError(`Cannot connect to trading server at ${FLASK_SERVER_URL}. Please ensure the Python backend is running on port 5000.`);
+                } else if (err.message.includes('CORS')) {
+                    setError(`CORS error: Server may not be configured to accept connections from this origin.`);
+                } else {
+                    setError(`Connection error: ${err.message}. Check if the backend server is running.`);
+                }
+                
+                console.log(`🔄 Connect Error logged: ${err.message} at ${new Date().toLocaleTimeString()}`);
                 
                 // Let the socket's built-in reconnection handle this
             });
@@ -1435,6 +1420,34 @@ function CandlestickChart() {
         };
     }, []); // Empty dependency array since this should only run once on mount
 
+    // Test connection function for debugging
+    const testConnection = useCallback(async () => {
+        console.log('🔍 Testing backend connection...');
+        try {
+            const response = await fetch(`${FLASK_SERVER_URL}/health`, {
+                method: 'GET',
+                headers: { 'Accept': 'application/json' },
+                credentials: 'include'
+            });
+            
+            if (response.ok) {
+                console.log('✅ Backend server is reachable');
+                const data = await response.json();
+                console.log('📊 Server status:', data);
+            } else {
+                console.warn(`⚠️ Backend responded with status: ${response.status}`);
+            }
+        } catch (error) {
+            console.error('❌ Backend connection test failed:', error.message);
+            console.error('🔍 Make sure the Python backend is running on port 5000');
+        }
+    }, []);
+
+    // Run connection test on component mount
+    useEffect(() => {
+        testConnection();
+    }, [testConnection]);
+
     // Handler for timeframe dropdown change
     const handleTimeframeChange = (event) => { 
         const newTimeframe = event.target.value;
@@ -1466,15 +1479,7 @@ function CandlestickChart() {
                     <option value="1w">1 Week</option>
                 </select>
                 
-                {/* Connection status indicator */}
-                <div className={`connection-status ${isConnected ? 'connected' : 'disconnected'}`}>
-                    <div className="status-icon"></div>
-                    {isConnected ? (
-                        <span>Real-time Connected {lastUpdateTime && `(Last: ${lastUpdateTime.split(':')[0]}:${lastUpdateTime.split(':')[1]})`}</span>
-                    ) : (
-                        <span>{isLoading ? "Connecting..." : "Disconnected"}</span>
-                    )}
-                </div>
+
             </div>
             
             <div ref={chartContainerRef} className="chart-container">

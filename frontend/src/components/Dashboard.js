@@ -223,7 +223,7 @@ const Dashboard = () => {
           {/* Brand */}
           <div className="brand">
             <img 
-              src="/Logo.png" 
+              src="/logo.png" 
               alt="TradePulse Logo" 
               className="brand-logo"
               onError={(e) => {
@@ -233,8 +233,8 @@ const Dashboard = () => {
             />
             <svg 
               xmlns="http://www.w3.org/2000/svg" 
-              width="32" 
-              height="32" 
+              width="48" 
+              height="48" 
               viewBox="0 0 24 24" 
               fill="none" 
               stroke="currentColor" 
@@ -251,7 +251,6 @@ const Dashboard = () => {
               <path d="M3 8a5 5 0 0 1 5-5"></path>
               <path d="M15 3a5 5 0 0 1 5 5"></path>
             </svg>
-            <h1>TradePulse</h1>
           </div>
 
           {/* Tab Navigation */}
@@ -300,13 +299,19 @@ const Dashboard = () => {
           
           {/* User Info */}
           <div className="dashboard-user-info">
-            <span className="username">{username}</span>
-            <button className="logout-button" onClick={handleLogout}>
-              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
-                <path fillRule="evenodd" d="M10 12.5a.5.5 0 0 1-.5.5h-8a.5.5 0 0 1-.5-.5v-9a.5.5 0 0 1 .5-.5h8a.5.5 0 0 1 .5.5v2a.5.5 0 0 0 1 0v-2A1.5 1.5 0 0 0 9.5 2h-8A1.5 1.5 0 0 0 0 3.5v9A1.5 1.5 0 0 0 1.5 14h8a1.5 1.5 0 0 0 1.5-1.5v-2a.5.5 0 0 0-1 0v2z"/>
-                <path fillRule="evenodd" d="M15.854 8.354a.5.5 0 0 0 0-.708l-3-3a.5.5 0 0 0-.708.708L14.293 7.5H5.5a.5.5 0 0 0 0 1h8.793l-2.147 2.146a.5.5 0 0 0 .708.708l3-3z"/>
+            <div className="user-profile">
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="user-icon">
+                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                <circle cx="12" cy="7" r="4"></circle>
               </svg>
-              <span>Logout</span>
+              <span className="username">{username}</span>
+            </div>
+            <button className="logout-button" onClick={handleLogout} title="Logout">
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+                <polyline points="16 17 21 12 16 7"></polyline>
+                <line x1="21" y1="12" x2="9" y2="12"></line>
+              </svg>
             </button>
           </div>
         </div>

@@ -17,27 +17,63 @@ body {
   width: 100vw;
   margin: 0;
   padding: 0;
-  font-family: 'Segoe UI', 'Roboto', 'Arial', sans-serif;
+  font-family: 'Inter', 'Segoe UI', 'Roboto', 'Arial', sans-serif;
+  /* Professional finance-themed background with multiple layers */
   background:
-    repeating-linear-gradient(0deg, rgba(31, 41, 55, 0.8) 0px, rgba(31, 41, 55, 0.8) 1px, transparent 1px, transparent 40px),
-    repeating-linear-gradient(90deg, rgba(31, 41, 55, 0.8) 0px, rgba(31, 41, 55, 0.8) 1px, transparent 1px, transparent 40px),
-    linear-gradient(120deg, #1f2937 0%, #374151 100%);
+    /* Dark overlay for better contrast */
+    linear-gradient(rgba(15, 23, 42, 0.85), rgba(30, 41, 59, 0.9)),
+    /* Subtle grid pattern */
+    repeating-linear-gradient(0deg, rgba(100, 116, 139, 0.1) 0px, rgba(100, 116, 139, 0.1) 1px, transparent 1px, transparent 50px),
+    repeating-linear-gradient(90deg, rgba(100, 116, 139, 0.1) 0px, rgba(100, 116, 139, 0.1) 1px, transparent 1px, transparent 50px),
+    /* Finance-themed gradient background */
+    radial-gradient(circle at 20% 80%, rgba(120, 119, 198, 0.3) 0%, transparent 50%),
+    radial-gradient(circle at 80% 20%, rgba(255, 119, 198, 0.15) 0%, transparent 50%),
+    radial-gradient(circle at 40% 40%, rgba(120, 200, 255, 0.2) 0%, transparent 50%),
+    linear-gradient(135deg, #0f172a 0%, #1e293b 25%, #334155 50%, #475569 75%, #1e293b 100%);
+  /* Professional dark base with subtle color accents */
+  background-size: 
+    100% 100%,
+    60px 60px,
+    60px 60px,
+    800px 800px,
+    600px 600px,
+    1000px 1000px,
+    100% 100%;
+  background-attachment: fixed;
   position: relative;
   overflow-x: hidden;
 }
 
+/* Animated background elements for depth */
 body::before {
   content: '';
   position: fixed;
-  top: 0; left: 0; right: 0; bottom: 0;
+  top: 0; 
+  left: 0; 
+  right: 0; 
+  bottom: 0;
   pointer-events: none;
-  opacity: 0.18;
+  opacity: 0.4;
   z-index: 0;
   background:
-    url('data:image/svg+xml;utf8,<svg width="1200" height="800" xmlns="http://www.w3.org/2000/svg"><g stroke="%2352c41a" stroke-width="2" opacity="0.3"><rect x="50" y="100" width="8" height="60" fill="%2352c41a"/><rect x="100" y="200" width="8" height="40" fill="%23ef4444"/><rect x="150" y="150" width="8" height="80" fill="%2352c41a"/><rect x="200" y="250" width="8" height="30" fill="%23ef4444"/><rect x="250" y="120" width="8" height="90" fill="%2352c41a"/><rect x="300" y="180" width="8" height="50" fill="%23ef4444"/><rect x="350" y="130" width="8" height="70" fill="%2352c41a"/><rect x="400" y="220" width="8" height="40" fill="%23ef4444"/></g></svg>') repeat;
-  background-size: 600px 400px;
-  background-position: center center;
-  filter: blur(0.5px);
+    /* Subtle trading chart patterns */
+    url('data:image/svg+xml;utf8,<svg width="1200" height="800" xmlns="http://www.w3.org/2000/svg"><defs><linearGradient id="grad1" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" style="stop-color:%2352c41a;stop-opacity:0.3" /><stop offset="100%" style="stop-color:%2306b6d4;stop-opacity:0.2" /></linearGradient></defs><g stroke="url(%23grad1)" stroke-width="1.5" fill="none" opacity="0.6"><path d="M50,400 Q200,300 350,350 T650,250 Q800,200 950,280 L1100,220"/><circle cx="350" cy="350" r="3" fill="%2352c41a" opacity="0.8"/><circle cx="650" cy="250" r="3" fill="%2306b6d4" opacity="0.8"/><circle cx="950" cy="280" r="3" fill="%2352c41a" opacity="0.8"/></g></svg>') repeat;
+  background-size: 1200px 800px;
+  background-position: 0 0, 600px 400px;
+  animation: floatBackground 20s ease-in-out infinite;
+  filter: blur(1px);
+}
+
+/* Floating background animation */
+@keyframes floatBackground {
+  0%, 100% { 
+    transform: translateY(0px) translateX(0px);
+    opacity: 0.4;
+  }
+  50% { 
+    transform: translateY(-10px) translateX(5px);
+    opacity: 0.6;
+  }
 }
 
 #root {
@@ -68,17 +104,62 @@ body::before {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(120deg, #1f2937 0%, #374151 100%);
   position: relative;
-  z-index: 0;
+  z-index: 1;
+  /* Additional glassmorphism backdrop for auth area */
+  backdrop-filter: blur(10px);
 }
 
 .centered-content {
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 1;
+  z-index: 2;
   width: 100%;
   max-width: 500px;
   padding: 20px;
+  /* Enhanced glassmorphism for the content area */
+  position: relative;
+}
+
+/* Add subtle glow effect to the auth area */
+.centered-content::before {
+  content: '';
+  position: absolute;
+  inset: -20px;
+  background: radial-gradient(circle at center, rgba(82, 196, 26, 0.1) 0%, transparent 70%);
+  border-radius: 30px;
+  pointer-events: none;
+  z-index: -1;
+  filter: blur(20px);
+}
+
+/* Mobile responsiveness improvements */
+@media (max-width: 768px) {
+  body {
+    background-size: 
+      100% 100%,
+      40px 40px,
+      40px 40px,
+      600px 600px,
+      400px 400px,
+      800px 800px,
+      100% 100%;
+  }
+  
+  .centered-content {
+    max-width: 90%;
+    padding: 15px;
+  }
+  
+  body::before {
+    background-size: 800px 600px;
+  }
+}
+
+@media (max-width: 480px) {
+  .centered-content {
+    max-width: 95%;
+    padding: 10px;
+  }
 }

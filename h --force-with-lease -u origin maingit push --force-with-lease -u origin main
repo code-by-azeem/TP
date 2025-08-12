@@ -1,0 +1,17 @@
+* [33m38f3378[m[33m ([m[1;31morigin/main[m[33m)[m Initial commit
+* [33mf829322[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m, [m[1;31morigin/master[m[33m, [m[1;31morigin/HEAD[m[33m)[m Improve the responsiveness and CSS of the pages specially login page
+* [33m8beab32[m Fix bot filtering overly show same data for multiple bot needs to test to verify
+* [33m1f5e767[m Trading bot working properly with trade execution by using some strategy but for the improvement in strategy for better results
+* [33mb8df3cb[m Recent changes
+* [33meb4243e[m Real-time connection implemented live updation in pnl and trade history but recent close trade and total pnl not update simultaneously needs to fix it
+* [33mfc3082b[m Fix the responsiveness below 1150px to 600px the timeaxis row properly show with date and time
+* [33ma050777[m Frontend is ready with logo and the color combination of pages based on logo more responsiveness handle completely
+* [33m7fa712d[m ALl Frontend Functionality implemented jsut need to inegrate bot with bot tab using trading_bot_integration.md file
+* [33m184521a[m All the three tabs of dashboard properly perform functionalities with responsiveness
+* [33m36ff6a5[m Need to fix account_info tab and trade_histroy tab Get data through the input username during authentication rather then used actual username when initialize call
+* [33mc23eb42[m Make the dashobard and other tabs of it responsive for all devices
+* [33m102a045[m Dashboard Create and Working properl with chart tab need to just need integrate real data with other tab
+* [33m719b43e[m Update frontend and backend with latest features and UI improvements
+* [33mc1ab20f[m Add frontend folder back to the repository
+* [33m70fedf1[m Remove frontend folder from repository
+* [33m07e7925[m Remove embedded Git repository in frontend

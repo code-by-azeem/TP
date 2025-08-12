@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # 🚀 TradePulse - Advanced Trading Platform with Bot Integration
 
 TradePulse is a comprehensive trading platform that combines real-time market data visualization with automated trading bot capabilities. Built with Flask/Python backend and React frontend, it integrates directly with MetaTrader 5 for live trading.
@@ -281,3 +282,7 @@ This project is licensed under the Mohib License - see the LICENSE file for deta
 ---
 
 **⚠️ Disclaimer**: Trading involves risk. This software is for educational purposes. Always test with demo accounts before live trading. The developers are not responsible for any financial losses.
+=======
+# TP
+TradePulse 
+>>>>>>> 38f33780ff538db6490a73763cb36e8aee95ec49

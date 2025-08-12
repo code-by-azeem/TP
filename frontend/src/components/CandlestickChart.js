@@ -1,6 +1,7 @@
 // frontend/src/components/CandlestickChart.js
 import React, { useEffect, useRef, useState, useCallback } from 'react';
-import { createChart, CrosshairMode, CandlestickSeries } from 'lightweight-charts';
+// import { createChart, CrosshairMode, CandlestickSeries } from 'lightweight-charts';
+import { createChart, CrosshairMode } from 'lightweight-charts';
 import io from 'socket.io-client';
 import './CandlestickChart.css';
 
@@ -868,7 +869,7 @@ function CandlestickChart() {
                 };
                 
                 // Add a candlestick series using v5 method
-                const series = chart.addSeries(CandlestickSeries, candlestickSeriesOptions);
+                const series = chart.addCandlestickSeries(candlestickSeriesOptions);
                 candlestickSeriesRef.current = series;
                 
                 // Override the update method to ensure timestamps are always numeric

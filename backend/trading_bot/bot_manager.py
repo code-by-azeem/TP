@@ -441,7 +441,34 @@ class TradingBotManager:
                 'price': result.price,
                 'sl': sl_price,
                 'tp': tp_price,
-                'performance': self.performance,  # Include updated performance
+                # 'performance': self.performance,  # Include updated performance
+                'strategy': self.config.get('strategy_name'),
+                'magic_number': self.unique_magic_number,
+                'user_id': getattr(self, 'owner_user_id', None),   # set when starting bot (see below)
+                'config_snapshot': {
+                    'max_risk_per_trade': self.config.get('max_risk_per_trade'),
+                    'trade_size_usd':     self.config.get('trade_size_usd'),
+                    'leverage':           self.config.get('leverage'),
+                    'asset_type':         self.config.get('asset_type'),
+
+                    'risk_reward_ratio':  self.config.get('risk_reward_ratio'),
+                    'stop_loss_pips':     self.config.get('stop_loss_pips'),
+                    'take_profit_pips':   self.config.get('take_profit_pips'),
+                    'max_loss_threshold': self.config.get('max_loss_threshold'),
+
+                    'entry_trigger':      self.config.get('entry_trigger'),
+                    'exit_trigger':       self.config.get('exit_trigger'),
+                    'max_daily_trades':   self.config.get('max_daily_trades'),
+                    'time_window':        self.config.get('time_window'),
+
+                    'rsi_period':             self.config.get('rsi_period'),
+                    'moving_average_period':  self.config.get('moving_average_period'),
+                    'bollinger_bands_period': self.config.get('bollinger_bands_period'),
+                    'bb_deviation':           self.config.get('bb_deviation'),
+
+                    'auto_stop_enabled':      self.config.get('auto_stop_enabled'),
+                    'max_consecutive_losses': self.config.get('max_consecutive_losses'),
+                    'auto_trading_enabled':   self.config.get('auto_trading_enabled'),},
                 'timestamp': datetime.now().isoformat()
             })
             

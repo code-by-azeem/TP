@@ -322,19 +322,19 @@ const Dashboard = () => {
         <div className="dashboard-info-panels">
           <div className="info-panel">
             <h3>Balance</h3>
-            <p className="value">{isLoading ? '—' : formatCurrency(accountData.balance)}</p>
+            <p className="value">{formatCurrency(accountData.balance)}</p>
           </div>
           <div className="info-panel">
             <h3>Equity</h3>
-            <p className="value">{isLoading ? '—' : formatCurrency(accountData.equity)}</p>
+            <p className="value">{formatCurrency(accountData.equity)}</p>
           </div>
           <div className="info-panel">
             <h3>Margin</h3>
-            <p className="value">{isLoading ? '—' : formatCurrency(accountData.margin)}</p>
+            <p className="value">{formatCurrency(accountData.margin)}</p>
           </div>
           <div className={`info-panel ${accountData.unrealized_profit >= 0 ? 'profit' : 'loss'}`}>
             <h3>Unrealized P/L</h3>
-            <p className="value">{isLoading ? '—' : formatCurrency(accountData.unrealized_profit)}</p>
+            <p className="value">{formatCurrency(accountData.unrealized_profit)}</p>
             <span className="panel-subtitle">{accountData.open_positions} open positions</span>
           </div>
         </div>
